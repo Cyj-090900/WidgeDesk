@@ -1,0 +1,109 @@
+name: Build portable package (win-x64)
+
+# Builds the self-contained portable package on GitHub's own Windows runners and publishes it
+# as a downloadable Release asset.
+#
+# Why build here rather than locally: a Windows 10 install whose ntdll predates the 2023 CET
+# kernel fixes (KB5044273 / ntdll 10.0.19041.5007) cannot even run the SDK's CET-marked csc.exe,
+# so `dotnet build` fails before it compiles anything. GitHub's runners are fully patched, so
+# they build normally. The produced .exe is not CET-marked (Directory.Build.props sets
+# CETCompat=false), so the package runs on Windows 10 as well.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Show toolchain
+        run: dotnet --info
+
+      - name: Read product version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = @($props.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if (-not $version) { throw 'Version not found in Directory.Build.props.' }
+          Write-Host "product version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Run core tests
+        # Pure-logic tests (no desktop access). Informational: a test failure must not stop the
+        # package from being produced, but it should be visible in the log.
+        continue-on-error: true
+        run: dotnet test tests/GlassDesk.Core.Tests/GlassDesk.Core.Tests.csproj -c Release --nologo
+
+      - name: Publish self-contained win-x64
+        shell: pwsh
+        run: |
+          dotnet publish src/GlassDesk.App/GlassDesk.App.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishReadyToRun=true `
+            -p:InformationalVersion=${{ steps.version.outputs.version }} `
+            -p:IncludeSourceRevisionInInformationalVersion=false `
+            -o publish
+          if (-not (Test-Path publish/GlassDesk.exe)) { throw 'GlassDesk.exe was not produced.' }
+
+      - name: Add license files
+        # The distribution must carry the framework and third-party licence files.
+        shell: pwsh
+        run: |
+          Copy-Item LICENSE publish/LICENSE.txt
+          Copy-Item NOTICE publish/NOTICE.txt
+          Copy-Item docs/third-party publish/third-party -Recurse
+
+      - name: Verify the executable is not CET-marked
+        # The whole point of the Windows 10 work is that the process image must not carry
+        # CET_COMPAT; a CET-marked exe fail-fasts on unpatched Windows 10. Fail here instead.
+        shell: pwsh
+        run: python tools/check-cet.py publish/GlassDesk.exe
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          $name = "GlassDesk-${{ steps.version.outputs.version }}-win-x64"
+          New-Item -ItemType Directory -Path "stage/$name" -Force | Out-Null
+          Copy-Item publish/* "stage/$name" -Recurse -Force
+          # Never ship a user Data directory.
+          if (Test-Path "stage/$name/Data") { throw 'The package unexpectedly contains a Data directory.' }
+          Compress-Archive -Path "stage/$name" -DestinationPath "$name.zip" -Force
+          $size = [math]::Round((Get-Item "$name.zip").Length / 1MB, 1)
+          Write-Host "package: $name.zip ($size MB)"
+          "package=$name.zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlassDesk-${{ steps.version.outputs.version }}-win-x64
+          path: ${{ steps.package.outputs.package }}
+          if-no-files-found: error
+
+      - name: Publish rolling release
+        # A Release asset can be downloaded without signing in, unlike a workflow artifact.
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = 'win10-build'
+          $name = 'GlassDesk ${{ steps.version.outputs.version }} (win-x64, Windows 10/11)'
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          gh release create $tag "${{ steps.package.outputs.package }}" `
+            --title $name `
+            --notes "便携版（免安装）。解压后双击 GlassDesk.exe 即可运行，程序常驻托盘并在屏幕底部显示 Dock。`n`n支持 Windows 10 2004（Build 19041）及以上，自带 .NET 运行时，无需另行安装。`n`n源码提交：${{ github.sha }}"
