@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    Keep the SDK projection (the 10.0.x version inside the target framework) for the newer
+    optional APIs, but lower the declared *runtime floor* to Windows 10 2004 (19041).
+
+    The two are easy to confuse and they do different things:
+      * TargetFramework=net10.0-windows10.0.26100.0 sets TargetPlatformVersion. That decides
+        which SDK projection and reference assemblies are used to compile; it does not gate
+        execution and it does not promise a minimum OS.
+      * SupportedOSPlatformVersion / TargetPlatformMinVersion are the runtime floor. Leaving
+        them at 22000 is what makes the build claim "Windows 11 only".
+
+    19041 is the floor because SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) - the
+    self-exclusion that keeps our own pixels out of the captured desktop - only exists from
+    Windows 10 2004 onward.
+  -->
+  <PropertyGroup Condition="$([System.String]::Copy('$(TargetFramework)').Contains('-windows'))">
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+  </PropertyGroup>
+</Project>

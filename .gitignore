@@ -1,0 +1,16 @@
+bin/
+obj/
+Data/
+artifacts/
+publish/
+.vs/
+.vscode/
+.idea/
+TestResults/
+*.log
+*.trx
+*.user
+*.suo
+*.pfx
+*.p12
+*.pem
