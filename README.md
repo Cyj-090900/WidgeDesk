@@ -5,7 +5,10 @@ Windows 桌面美化工具：玻璃 Dock、启动台和统一设置中心，x64�
 支持 Windows 10 2004（Build 19041）及以上。Windows 11 会启用系统圆角与背景材质，
 Windows 10 上这些特性按能力探测并自动回退到自绘，功能保持一致。
 
-[下载正式版本](https://github.com/everlosttime/glassdesk-updates/releases) · [源码版本](https://github.com/everlosttime/glassdesk-open-source/tags)
+[下载本分支构建](https://github.com/Cyj-090900/WinDesktopWidge/releases) · [源码仓库](https://github.com/Cyj-090900/WinDesktopWidge)
+
+> 这是 [everlosttime/glassdesk-open-source](https://github.com/everlosttime/glassdesk-open-source)
+> 的分支，增加了 Windows 10 兼容支持。更新检查指向本仓库的 Releases，不会再去请求上游作者的发布包。
 
 ## 公开版本
 

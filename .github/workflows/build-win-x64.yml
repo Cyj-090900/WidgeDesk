@@ -1,13 +1,22 @@
-name: Build portable package (win-x64)
+name: Build packages (win-x64)
 
-# Builds the self-contained portable package on GitHub's own Windows runners and publishes it
-# as a downloadable Release asset.
+# Builds both deliverables on GitHub's own Windows runners and publishes them as a Release:
+#   * an Inno Setup installer  - this is what the in-app updater consumes
+#   * a portable zip           - for people who do not want to install anything
 #
 # Why build here rather than locally: a Windows 10 install whose ntdll predates the 2023 CET
 # kernel fixes (KB5044273 / ntdll 10.0.19041.5007) cannot even run the SDK's CET-marked csc.exe,
-# so `dotnet build` fails before it compiles anything. GitHub's runners are fully patched, so
-# they build normally. The produced .exe is not CET-marked (Directory.Build.props sets
-# CETCompat=false), so the package runs on Windows 10 as well.
+# so `dotnet build` fails before compiling anything. GitHub's runners are fully patched. The
+# produced binaries are not CET-marked (Directory.Build.props sets CETCompat=false), so the
+# packages still run on Windows 10.
+#
+# The updater (GlassDesk.AppServices.Updates.UpdateClient) is strict, and this workflow has to
+# satisfy it exactly:
+#   * the release tag must be a plain X.Y.Z version, optionally prefixed with "v";
+#   * the asset must be named GlassDesk-<version>-win-x64-Setup.exe;
+#   * the release must win the repository's "latest" query (not a draft or prerelease);
+#   * the asset must carry a sha256 digest, which GitHub computes automatically on upload.
+# A mismatched name or tag makes the app report a malformed update instead of finding one.
 
 on:
   workflow_dispatch:
@@ -30,9 +39,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Show toolchain
-        run: dotnet --info
-
       - name: Read product version
         id: version
         shell: pwsh
@@ -40,12 +46,13 @@ jobs:
           [xml]$props = Get-Content Directory.Build.props
           $version = @($props.Project.PropertyGroup.Version | Where-Object { $_ })[0]
           if (-not $version) { throw 'Version not found in Directory.Build.props.' }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Version '$version' must be a plain X.Y.Z; the updater rejects anything else." }
           Write-Host "product version: $version"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Run core tests
-        # Pure-logic tests (no desktop access). Informational: a test failure must not stop the
-        # package from being produced, but it should be visible in the log.
+        # Pure-logic tests, no desktop access. Informational: a failure stays visible in the log
+        # but must not stop the package from being produced.
         continue-on-error: true
         run: dotnet test tests/GlassDesk.Core.Tests/GlassDesk.Core.Tests.csproj -c Release --nologo
 
@@ -59,9 +66,9 @@ jobs:
             -p:IncludeSourceRevisionInInformationalVersion=false `
             -o publish
           if (-not (Test-Path publish/GlassDesk.exe)) { throw 'GlassDesk.exe was not produced.' }
+          if (-not (Test-Path publish/update-source.json)) { throw 'update-source.json was not published; the updater would fall back to its compiled-in source.' }
 
-      - name: Add license files
-        # The distribution must carry the framework and third-party licence files.
+      - name: Add licence files
         shell: pwsh
         run: |
           Copy-Item LICENSE publish/LICENSE.txt
@@ -69,41 +76,100 @@ jobs:
           Copy-Item docs/third-party publish/third-party -Recurse
 
       - name: Verify the executable is not CET-marked
-        # The whole point of the Windows 10 work is that the process image must not carry
-        # CET_COMPAT; a CET-marked exe fail-fasts on unpatched Windows 10. Fail here instead.
+        # A CET-marked image fail-fasts on unpatched Windows 10, which is the whole point of this
+        # fork. Fail the build rather than ship a package that cannot start there.
         shell: pwsh
         run: python tools/check-cet.py publish/GlassDesk.exe
 
-      - name: Package
-        id: package
+      - name: Install Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $candidates = @(
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw 'ISCC.exe not found after installing Inno Setup.' }
+          Write-Host "ISCC: $iscc"
+          "iscc=$iscc" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $env:GLASSDESK_PACKAGE_STAGE = (Resolve-Path publish).Path
+          Push-Location packaging
+          try {
+            & "${{ steps.inno.outputs.iscc }}" `
+              /DAppIdValue=GlassDesk.Independent `
+              "/DProductVersion=${{ steps.version.outputs.version }}" `
+              "/DFileVersion=${{ steps.version.outputs.version }}.0" `
+              "/DPackageBaseName=GlassDesk-${{ steps.version.outputs.version }}-win-x64" `
+              /O..\artifacts `
+              GlassDesk-Capture.iss
+            if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE." }
+          } finally { Pop-Location }
+          Get-ChildItem artifacts | ForEach-Object { Write-Host "  produced: $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)" }
+
+      - name: Verify installer name matches what the updater expects
+        # UpdateClient looks for exactly GlassDesk-<version>-win-x64-Setup.exe. Getting this wrong
+        # is the difference between the updater working and silently reporting "no update".
+        shell: pwsh
+        run: |
+          $expected = "GlassDesk-${{ steps.version.outputs.version }}-win-x64-Setup.exe"
+          if (-not (Test-Path "artifacts/$expected")) {
+            Get-ChildItem artifacts | ForEach-Object { Write-Host "found: $($_.Name)" }
+            throw "Expected installer '$expected' was not produced."
+          }
+          Write-Host "installer OK: $expected"
+
+      - name: Package portable zip
         shell: pwsh
         run: |
           $name = "GlassDesk-${{ steps.version.outputs.version }}-win-x64"
           New-Item -ItemType Directory -Path "stage/$name" -Force | Out-Null
           Copy-Item publish/* "stage/$name" -Recurse -Force
-          # Never ship a user Data directory.
           if (Test-Path "stage/$name/Data") { throw 'The package unexpectedly contains a Data directory.' }
-          Compress-Archive -Path "stage/$name" -DestinationPath "$name.zip" -Force
-          $size = [math]::Round((Get-Item "$name.zip").Length / 1MB, 1)
-          Write-Host "package: $name.zip ($size MB)"
-          "package=$name.zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Compress-Archive -Path "stage/$name" -DestinationPath "artifacts/$name.zip" -Force
+          Write-Host "portable zip: $name.zip"
 
-      - name: Upload artifact
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: GlassDesk-${{ steps.version.outputs.version }}-win-x64
-          path: ${{ steps.package.outputs.package }}
+          path: artifacts/*
           if-no-files-found: error
 
-      - name: Publish rolling release
-        # A Release asset can be downloaded without signing in, unlike a workflow artifact.
+      - name: Publish release
+        # The tag is the plain product version (v-prefixed), because the updater parses
+        # tag_name as X.Y.Z and compares it against the running product version.
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = 'win10-build'
-          $name = 'GlassDesk ${{ steps.version.outputs.version }} (win-x64, Windows 10/11)'
+          $tag = "v${{ steps.version.outputs.version }}"
+          $version = "${{ steps.version.outputs.version }}"
+
+          # Remove the earlier ad-hoc tag from the first iteration: its name is not a version,
+          # so the updater would reject it, and it must not linger as the repository's latest.
+          gh release delete win10-build --yes --cleanup-tag 2>$null
+
+          # Drop any earlier build of this same version so this run replaces it cleanly and the
+          # release stays eligible as the repository's "latest".
           gh release delete $tag --yes --cleanup-tag 2>$null
-          gh release create $tag "${{ steps.package.outputs.package }}" `
-            --title $name `
-            --notes "便携版（免安装）。解压后双击 GlassDesk.exe 即可运行，程序常驻托盘并在屏幕底部显示 Dock。`n`n支持 Windows 10 2004（Build 19041）及以上，自带 .NET 运行时，无需另行安装。`n`n源码提交：${{ github.sha }}"
+
+          $notes = @"
+          自包含构建，无需另装 .NET 运行时。
+
+          - ``GlassDesk-$version-win-x64-Setup.exe`` — 安装版，**设置中心的"检查更新"用它**。
+          - ``GlassDesk-$version-win-x64.zip`` — 便携版，解压后双击 GlassDesk.exe 即可运行（不支持自我更新）。
+
+          系统要求：Windows 10 2004（Build 19041）及以上，x64。
+
+          源码提交：${{ github.sha }}
+          "@
+
+          gh release create $tag artifacts/* --title "GlassDesk $version (win-x64)" --notes $notes
+          Write-Host "released: $tag"

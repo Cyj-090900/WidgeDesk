@@ -32,7 +32,9 @@ internal sealed partial class AppHost
 
     private UpdateClient CreateUpdateClient()
     {
-        const string defaultSource = "https://api.github.com/repos/everlosttime/glassdesk-updates/releases/latest";
+        // Fallback when update-source.json is absent; keep it pointing at this fork's releases
+        // so a stray build can never offer the upstream author's packages.
+        const string defaultSource = "https://api.github.com/repos/Cyj-090900/WinDesktopWidge/releases/latest";
         var file = Path.Combine(AppContext.BaseDirectory, "update-source.json");
         var source = defaultSource;
         if (File.Exists(file))

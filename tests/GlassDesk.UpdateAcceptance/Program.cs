@@ -45,9 +45,9 @@ internal static class Program
             settings.Close();
 
             var release = new UpdateRelease(new Version(0, 2, 10), "GlassDesk-0.2.10-win-x64-Setup.exe",
-                new Uri("https://github.com/everlosttime/glassdesk-updates/releases/download/v0.2.10/GlassDesk-0.2.10-win-x64-Setup.exe"),
+                new Uri("https://github.com/Cyj-090900/WinDesktopWidge/releases/download/v0.2.10/GlassDesk-0.2.10-win-x64-Setup.exe"),
                 new string('a', 64), 4096, "本次更新\n• 增加启动检查和手动检查更新\n• 后台下载显示百分比，可取消\n• 安装后自动重新打开，保留配置和图标\n\n" + string.Concat(Enumerable.Repeat("详细更新说明：下载完成并校验通过后才执行更新。\n", 22)),
-                new Uri("https://github.com/everlosttime/glassdesk-updates/releases/tag/v0.2.10"));
+                new Uri("https://github.com/Cyj-090900/WinDesktopWidge/releases/tag/v0.2.10"));
             var calls = 0;
             CancellationToken token = default;
             TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -140,7 +140,7 @@ internal static class Program
         try
         {
             using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-            var source = new Uri("https://api.github.com/repos/everlosttime/glassdesk-updates/releases/latest");
+            var source = new Uri("https://api.github.com/repos/Cyj-090900/WinDesktopWidge/releases/latest");
             var client = new UpdateClient(http, source);
             var expectedVersion = Version.Parse(System.Diagnostics.FileVersionInfo.GetVersionInfo(expectedInstaller).ProductVersion!.Trim());
             var release = await client.CheckAsync(previousVersion, CancellationToken.None);
