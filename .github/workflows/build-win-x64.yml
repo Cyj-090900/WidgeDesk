@@ -85,21 +85,34 @@ jobs:
         id: inno
         shell: pwsh
         run: |
-          choco install innosetup --no-progress -y
-          $candidates = @(
-            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
-            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          # Inno Setup 7 is required: the .iss uses SetupArchitecture, an IS7-only directive, and
+          # IS6 aborts on it with "Unrecognized [Setup] section directive". Chocolatey only
+          # carries IS6, so fetch the official IS7 release from the vendor's GitHub.
+          #
+          # jrsoftware/issrc publishes one release per Inno Setup version, tagged is-<x>_<y>_<z>.
+          $version = '7.1.0'
+          $tag = 'is-' + ($version -replace '\.', '_')
+          $url = "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$version-x64.exe"
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-$version-x64.exe"
+          $target = Join-Path $env:RUNNER_TEMP "innosetup7"
+          Write-Host "downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
+          Start-Process -FilePath $installer -Wait -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$target"
           )
-          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $iscc) { throw 'ISCC.exe not found after installing Inno Setup.' }
+          $iscc = Join-Path $target 'ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc after installing Inno Setup 7." }
           Write-Host "ISCC: $iscc"
+          if (-not (Test-Path (Join-Path $target 'Languages\ChineseSimplified.isl'))) {
+            throw 'ChineseSimplified.isl is missing; the [Languages] section requires it.'
+          }
           "iscc=$iscc" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Compile installer
         shell: pwsh
         run: |
           $env:GLASSDESK_PACKAGE_STAGE = (Resolve-Path publish).Path
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           Push-Location packaging
           try {
             & "${{ steps.inno.outputs.iscc }}" `
@@ -107,7 +120,7 @@ jobs:
               "/DProductVersion=${{ steps.version.outputs.version }}" `
               "/DFileVersion=${{ steps.version.outputs.version }}.0" `
               "/DPackageBaseName=GlassDesk-${{ steps.version.outputs.version }}-win-x64" `
-              /O..\artifacts `
+              "/O$(Resolve-Path ..\artifacts)" `
               GlassDesk-Capture.iss
             if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE." }
           } finally { Pop-Location }

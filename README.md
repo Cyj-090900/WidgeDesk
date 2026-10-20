@@ -65,14 +65,19 @@ artifacts/publish 中的 GlassDesk.exe 可直接运行。不要把自己的 Data
 
 ## 从源码生成安装包
 
-另安装 Inno Setup 7，并将 ISCC.exe 所在目录加入当前终端的 PATH。先执行上面的便携版发布命令，再执行：
+另安装 Inno Setup 6.3 及以上（`ArchitecturesAllowed=x64os` 从 6.3 起支持），并将 ISCC.exe
+所在目录加入当前终端的 PATH。先执行上面的便携版发布命令，再执行：
 
 ```powershell
 $env:GLASSDESK_PACKAGE_STAGE = (Resolve-Path artifacts/publish).Path
-ISCC /DAppIdValue=GlassDesk.Independent "/DProductVersion=$version" "/DFileVersion=$version.0" /DWindows11Compatibility=1 "/DPackageBaseName=GlassDesk-$version-win-x64" /Oartifacts packaging/GlassDesk-Capture.iss
+ISCC /DAppIdValue=GlassDesk.Independent "/DProductVersion=$version" "/DFileVersion=$version.0" "/DPackageBaseName=GlassDesk-$version-win-x64" /Oartifacts packaging/GlassDesk-Capture.iss
 ```
 
 安装包支持选择目录。安装更新保留设置、应用库、布局和图标缓存，卸载也保留 Data。此源码打包流程不要求私有仓库的旧安装载荷。
+
+产出的安装包名为 `GlassDesk-<版本>-win-x64-Setup.exe`。**这个文件名不能改**：设置中心的
+「检查更新」按这个规则在本仓库的 Releases 中查找资产（见 `UpdateClient`），改名会导致
+更新器报告「更新信息无效」。Release 标签也必须是纯版本号（如 `v1.3.1`）。
 
 ## 修改着色器
 

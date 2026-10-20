@@ -1,4 +1,10 @@
-; User-scope x64 installer for the local GlassDesk candidate.
+; User-scope x64 installer for GlassDesk.
+;
+; Requires Inno Setup 7. SetupArchitecture and the x64os architecture identifiers below are
+; Inno Setup 7 syntax; Inno Setup 6 rejects SetupArchitecture with "Unrecognized [Setup]
+; section directive". The GitHub workflow downloads Inno Setup 7 from its official release
+; rather than using Chocolatey, which only carries version 6.
+;
 #ifndef AppIdValue
   #error AppIdValue is required.
 #endif
