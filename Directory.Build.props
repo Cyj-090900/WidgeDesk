@@ -1,25 +1,25 @@
 <Project>
 
   <!--
-    Common build settings for every project in the WidgeDesktop solution.
+    Common build settings for every project in the Widge solution.
 
     Target framework rules:
-      * src/WidgeDesktop.Core            -> net10.0          (no UI, no Windows APIs, unit-testable)
-      * src/WidgeDesktop.System          -> net10.0-windows  (Win32 interop)
+      * src/Widge.Core            -> net10.0          (no UI, no Windows APIs, unit-testable)
+      * src/Widge.System          -> net10.0-windows  (Win32 interop)
       * everything else under src/    -> net10.0-windows  (WPF)
-      * src/WidgeDesktop.App             -> WinExe, the only executable we ship
+      * src/Widge.App             -> WinExe, the only executable we ship
   -->
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <Product>WidgeDesktop</Product>
-    <Company>WidgeDesktop</Company>
+    <Product>Widge</Product>
+    <Company>Widge</Company>
     <!-- Product updates use this version; retain the delivered assembly identity. -->
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <AssemblyVersion>0.2.2.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <FileVersion>3.0.0.0</FileVersion>
     <NeutralLanguage>zh-Hans</NeutralLanguage>
 
     <EnableNETAnalyzers>true</EnableNETAnalyzers>

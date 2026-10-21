@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Settings centre. Phase 1 ships a placeholder; the eight pages arrive across phases 2-6.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RootNamespace>Widge.Settings</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Widge.Settings</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Widge.Core\Widge.Core.csproj" />
+    <ProjectReference Include="..\Widge.UI\Widge.UI.csproj" />
+  </ItemGroup>
+
+</Project>

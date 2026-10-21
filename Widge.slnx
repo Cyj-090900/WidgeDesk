@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Widge.App/Widge.App.csproj" />
+    <Project Path="src/Widge.AppServices/Widge.AppServices.csproj" />
+    <Project Path="src/Widge.Core/Widge.Core.csproj" />
+    <Project Path="src/Widge.Dock/Widge.Dock.csproj" />
+    <Project Path="src/Widge.Launcher/Widge.Launcher.csproj" />
+    <Project Path="src/Widge.Platform/Widge.Platform.csproj" />
+    <Project Path="src/Widge.Settings/Widge.Settings.csproj" />
+    <Project Path="src/Widge.UI/Widge.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Widge.Core.Tests/Widge.Core.Tests.csproj" />
+    <Project Path="tests/Widge.AppServices.Tests/Widge.AppServices.Tests.csproj" />
+    <Project Path="tests/Widge.InstanceProbe/Widge.InstanceProbe.csproj" />
+    <Project Path="tests/Widge.Dock.Tests/Widge.Dock.Tests.csproj" />
+    <Project Path="tests/Widge.UiAcceptance/Widge.UiAcceptance.csproj" />
+    <Project Path="tests/Widge.LauncherAcceptance/Widge.LauncherAcceptance.csproj" />
+    <Project Path="tests/Widge.InteractionAcceptance/Widge.InteractionAcceptance.csproj" />
+    <Project Path="tests/Widge.DesktopAcceptance/Widge.DesktopAcceptance.csproj" />
+  </Folder>
+</Solution>
