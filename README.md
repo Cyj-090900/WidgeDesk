@@ -7,7 +7,7 @@ Windows 10 上这些特性按能力探测并自动回退到自绘，功能保持
 
 ## 许可证
 
-原创代码来自GlassDesk ，本项目允许修改、非商用及闭源衍生产品，须遵守版权、许可、修改声明等要求。完整条款见 LICENSE；第三方代码与资源保留自身许可，详见 NOTICE 和 docs/third-party。
+原创代码来自 GlassDesk，采用 Apache License 2.0，允许修改、商用及闭源衍生产品，须遵守版权、许可、修改声明等要求。完整条款见 LICENSE；第三方代码与资源保留自身许可，详见 NOTICE 和 docs/third-party。
 
 GlassDesk 不打包用户导入应用的图标，项目许可不授予第三方商标权利。
 
