@@ -39,6 +39,8 @@ public partial class LauncherWindow : GlassWindow
     private string? _notice;
     private bool _imeComposing;
     private bool _preparedForShow;
+    /// <summary>窗口关过之后，下次显示要把搜索框恢复成空。见 <see cref="PrepareToShow"/>。</summary>
+    private bool _searchNeedsReset;
     private int _openContextMenuCount;
     private int _keepOpenWhileModalCount;
     private PixelRect _panelPixelBounds;
@@ -80,6 +82,19 @@ public partial class LauncherWindow : GlassWindow
 
     public void PrepareToShow()
     {
+        // 搜索是临时意图，不该跨会话保留：用户关掉启动台再打开，期望看到的是自己的
+        // 应用，而不是上次没搜完的那一串字。清控件而不是只清 _view —— OnSearchChanged
+        // 会把状态与控件一起同步，并顺手收回右侧的清除按钮。
+        //
+        // 只在「上一次是关着的」时清：ShowWithTransition 在窗口已经可见时也会走到这里
+        // （从 Dock 再点一次、显示器恢复），那种情况属于同一次会话，把用户正在输入的
+        // 搜索词抹掉是错的。
+        if (_searchNeedsReset)
+        {
+            _searchNeedsReset = false;
+            if (SearchBox.Text.Length > 0) SearchBox.Clear();
+        }
+
         if (!_settings.RememberLastPage) _view.MoveToPage(0);
         RefreshLibrary(reuseUnchanged: true);
         _preparedForShow = IsLoaded && _services is not null && _workspace is not null;
@@ -268,6 +283,8 @@ public partial class LauncherWindow : GlassWindow
             CancelDrag();
             _view.OpenGroupId = null;
             GroupPanel.Visibility = Visibility.Collapsed;
+            // 窗口关上了：下次显示时把搜索框恢复成空，回到默认的浏览页。
+            _searchNeedsReset = true;
         }
         else
         {

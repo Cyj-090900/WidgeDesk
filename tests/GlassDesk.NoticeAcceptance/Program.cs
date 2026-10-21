@@ -148,6 +148,29 @@ internal static class Program
             Pump(2000);
             Check("Errors remain available to read", status.Visibility == Visibility.Visible);
 
+            // 关掉启动台再打开，搜索框回到空、网格回到浏览页的第一页。
+            // 走真实开关路径（CloseWithTransition + ShowWithTransition），而不是直接调
+            // PrepareToShow——后者在窗口已经可见时也会被调用（从 Dock 再点一次、
+            // 显示器恢复），那种情况属于同一次会话，不该清掉用户正在输入的搜索词。
+            var pageLabel = (TextBlock)window.FindName("PageText")!;
+            window.NavigatePage(1);
+            search.Text = "Test app";
+            Pump(300);
+            var searchingTiles = grid.Children.Count;
+            window.CloseWithTransition();
+            Pump(900);
+            var hidden = !window.IsVisible;
+            window.ShowWithTransition(null);
+            Pump(900);
+            Check("Closing the launcher actually hides it", hidden);
+            Check("Reopening clears the previous search",
+                search.Text.Length == 0 && clear.Visibility == Visibility.Collapsed);
+            // 期望值取「关之前浏览视图有几项」：搜索态与浏览态的项数本就不同，
+            // 写死数字只会让这条断言依赖测试数据的细节。
+            Check("Reopening returns to the first browse page",
+                pageLabel.Text == "1 / 1" && grid.Children.Count > 0
+                && grid.Children.Count != searchingTiles);
+
             void Add() => typeof(LauncherWindow).GetMethod("ImportPaths",
                 BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [new List<string> { input }]);
         }
