@@ -5,28 +5,9 @@ Windows 桌面美化工具：玻璃 Dock、启动台和统一设置中心，x64�
 支持 Windows 10 2004（Build 19041）及以上。Windows 11 会启用系统圆角与背景材质，
 Windows 10 上这些特性按能力探测并自动回退到自绘，功能保持一致。
 
-[下载本分支构建](https://github.com/Cyj-090900/WinDesktopWidge/releases) · [源码仓库](https://github.com/Cyj-090900/WinDesktopWidge)
-
-> 这是 [everlosttime/glassdesk-open-source](https://github.com/everlosttime/glassdesk-open-source)
-> 的分支，增加了 Windows 10 兼容支持。更新检查指向本仓库的 Releases，不会再去请求上游作者的发布包。
-> 仓库名沿用 `WinDesktopWidge`，程序本身叫 GlassDesk：两者不一致是历史原因，功能上没有任何差别。
-
-## 公开版本
-
-- v1.2.2：历史源码快照，包含启动台子图标 DPI 事件引发背景重建的修复。
-- v1.3.1：包含可独立开关的启动台、此电脑、桌面图标显隐入口、此前的外观与后台资源管理改进，以及 Dock 在窗口最大化/还原后刷新玻璃背景的修复。
-- v1.3.2：增加搜索框扩展，可直接搜索全系统应用与本地文件。
-- v4.0.0：撤销 2.0.0 与 3.0.0 的更名，恢复为 GlassDesk；功能与 1.3.2 相同。
-- v4.1.0：**当前源码快照**。搜索结果打开即入库（应用自动进启动台，文件不收录），搜索框加一键清除按钮。
-
-> 标签 v2.0.0 与 v3.0.0 是两次改名的中间产物（GlassDesk → WidgeDesktop → Widge），
-> 已整体撤销，仅作历史留存，不建议使用。
-
-每个标签是对应版本的独立完整源码快照。旧开发历史、本机用户数据、截图、日志和验收记录不包含在这个仓库中。原始版本来源见 SOURCE-PROVENANCE.json。
-
 ## 许可证
 
-GlassDesk 原创代码采用 Apache License 2.0，允许修改、商用及闭源衍生产品，须遵守版权、许可、修改声明等要求。完整条款见 LICENSE；第三方代码与资源保留自身许可，详见 NOTICE 和 docs/third-party。
+原创代码来自GlassDesk ，本项目允许修改、非商用及闭源衍生产品，须遵守版权、许可、修改声明等要求。完整条款见 LICENSE；第三方代码与资源保留自身许可，详见 NOTICE 和 docs/third-party。
 
 GlassDesk 不打包用户导入应用的图标，项目许可不授予第三方商标权利。
 
