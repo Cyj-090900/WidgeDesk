@@ -1,4 +1,4 @@
-# GlassDesk
+# WinDesktopWidge
 
 Windows 桌面美化工具：玻璃 Dock、启动台和统一设置中心，x64。
 
