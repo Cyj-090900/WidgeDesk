@@ -183,6 +183,14 @@ public sealed class LaunchService : ILaunchService
             return false;
         }
 
+        // shell: 目标（打包应用与 UWP 的 shell:AppsFolder\<AUMID>）不是文件路径，
+        // 用 File.Exists 判断必然为假，会把一条完全可用的记录标成失效。
+        // 这类目标能不能打开只有外壳知道，这里不做判断——交给启动去撞真实结果。
+        if (IsShellTarget(entry.Target))
+        {
+            return false;
+        }
+
         try
         {
             return !File.Exists(entry.Target) && !Directory.Exists(entry.Target);
@@ -194,6 +202,18 @@ public sealed class LaunchService : ILaunchService
             return false;
         }
     }
+
+    /// <summary>
+    /// 目标是不是由外壳解析的形式（<c>shell:...</c>），而不是文件系统路径。
+    /// </summary>
+    /// <remarks>
+    /// 只认 <c>shell:</c> 前缀，且要求后面还有内容：<c>shell:AppsFolder\&lt;AUMID&gt;</c>
+    /// 是这类目标的典型形式。<c>ShellExecutor</c> 本来就把 <c>shell:</c> 开头的字符串
+    /// 交给外壳，这里的判断与它保持一致。
+    /// </remarks>
+    private static bool IsShellTarget(string target) =>
+        target.StartsWith("shell:", StringComparison.OrdinalIgnoreCase)
+        && target.Length > "shell:".Length;
 
     private static ActivationResult Raise(WindowCandidateInfo window)
     {

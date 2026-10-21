@@ -264,6 +264,69 @@ public class LaunchServiceTests
         Assert.False(LaunchService.IsTargetGone(document));
     }
 
+    /// <summary>
+    /// <c>shell:</c> 目标不是文件路径，不能被「文件在不在」判成失效。
+    /// </summary>
+    /// <remarks>
+    /// 从搜索结果添加的打包应用与 UWP 应用，目标形如
+    /// <c>shell:AppsFolder\&lt;AUMID&gt;</c>。它不是磁盘上的文件，<c>File.Exists</c>
+    /// 必然为假；一旦被标成失效，磁贴会显示 ⚠ 并且点不动，而且每次启动复查都会
+    /// 重新标一遍——用户看到的就是「这个应用老是失效」。
+    /// </remarks>
+    [Fact]
+    public void 外壳目标不会被判成失效()
+    {
+        const string aumid = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
+        var entry = AppEntryFactory.CreateFromInstalledApp(
+            "计算器", $@"shell:AppsFolder\{aumid}", aumid);
+
+        Assert.False(LaunchService.IsTargetGone(entry), "shell: 目标被误判为不存在");
+        Assert.False(entry.IsTargetMissing);
+
+        // 反证：同一个判断对真正不存在的文件必须仍然为真，否则这个豁免就开得太大，
+        // 会把「目标真的没了」也一并放过。
+        var ghost = AppEntryFactory.CreateFromInstalledApp(
+            "已经不存在的程序", @"C:\这个路径\一定不存在\nothing.exe", null);
+        Assert.True(LaunchService.IsTargetGone(ghost));
+    }
+
+    /// <summary>
+    /// 重启时复查会把误标的 <c>shell:</c> 条目恢复回来。
+    /// </summary>
+    /// <remarks>
+    /// 这是用户实际感受的那一幕：之前版本已经把搜索结果加进来的应用标成了失效，
+    /// 升级后不该继续挂着 ⚠。复查走的是同一条 <c>RefreshMissingTargets</c>，
+    /// 所以修好判定之后旧标记会被自动清掉并落盘，不需要用户手动重新定位。
+    /// </remarks>
+    [Fact]
+    public void 复查把误标的失效条目恢复并落盘()
+    {
+        using var temp = new TempWorkspace();
+        var data = temp.CreateStore();
+        data.LoadAll();
+        using var host = new AppServiceHost(data);
+
+        const string aumid = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
+        var entry = AppEntryFactory.CreateFromInstalledApp(
+            "计算器", $@"shell:AppsFolder\{aumid}", aumid);
+        host.Import.AddInstalledApp(entry);
+
+        // 模拟旧版本留下的错误标记：先手工置位并落盘，就像升级前那样。
+        var stored = data.Library.Find(entry.Id)!;
+        stored.IsTargetMissing = true;
+        data.Library.Save();
+
+        var report = host.Maintenance.RefreshMissingTargets();
+
+        Assert.False(data.Library.Find(entry.Id)!.IsTargetMissing, "复查没有清掉误标的失效标记");
+        Assert.Contains(report.Recovered, item => item.Id == entry.Id);
+
+        // 标记必须真的写回磁盘，否则下次启动又会看到 ⚠。
+        var reopened = temp.CreateStore();
+        reopened.LoadAll();
+        Assert.False(reopened.Library.Find(entry.Id)!.IsTargetMissing, "恢复后的状态没有落盘");
+    }
+
     [Fact]
     public void 非程序条目不做窗口匹配()
     {
