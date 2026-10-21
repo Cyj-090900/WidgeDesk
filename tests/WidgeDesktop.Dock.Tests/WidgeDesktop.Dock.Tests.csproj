@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the dock window shell: window-style contracts (WS_EX_NOACTIVATE) and the
+    dock settings notification pipe. Separate from WidgeDesktop.Core.Tests because these
+    create real WPF windows and read real window styles, so they need net10.0-windows
+    and an STA thread; separate from WidgeDesktop.AppServices.Tests because they exercise
+    the presentation layer, not the application services.
+
+    Package versions are pinned centrally in Directory.Packages.props.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RootNamespace>WidgeDesktop.Dock.Tests</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WidgeDesktop.Dock\WidgeDesktop.Dock.csproj" />
+    <ProjectReference Include="..\..\src\WidgeDesktop.Settings\WidgeDesktop.Settings.csproj" />
+    <ProjectReference Include="..\..\src\WidgeDesktop.Launcher\WidgeDesktop.Launcher.csproj" />
+    <ProjectReference Include="../WidgeDesktop.CompatibilityProbe/WidgeDesktop.CompatibilityProbe.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/WidgeDesktop.App/WidgeDesktop.App.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

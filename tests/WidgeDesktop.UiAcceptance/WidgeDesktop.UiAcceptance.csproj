@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/WidgeDesktop.Dock/WidgeDesktop.Dock.csproj" />
+    <ProjectReference Include="../../src/WidgeDesktop.Launcher/WidgeDesktop.Launcher.csproj" />
+  </ItemGroup>
+</Project>
