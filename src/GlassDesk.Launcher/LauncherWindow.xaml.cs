@@ -95,6 +95,7 @@ public partial class LauncherWindow : GlassWindow
     {
         if (!IsLoaded || _services is null || _workspace is null) return;
         if (!reuseUnchanged) _iconLoader.Clear();
+        SyncClearSearchButton();
         try
         {
             _workspace.Reconcile(_view.Capacity);

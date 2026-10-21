@@ -289,8 +289,25 @@ public partial class LauncherWindow
     {
         _view.Query = SearchBox.Text;
         _view.OpenGroupId = null;
+        SyncClearSearchButton();
         ScheduleSystemSearch();
         RenderTiles();
+    }
+
+    /// <summary>有内容才显示一键清除；空的时候留着它只会白占位置。</summary>
+    /// <remarks>
+    /// 单独成方法是因为它有两个触发点：输入变化，以及窗口重新显示。
+    /// 搜索词在隐藏后仍然保留，重开时若不同步，按钮会与实际内容对不上。
+    /// </remarks>
+    private void SyncClearSearchButton() =>
+        ClearSearchButton.Visibility = _view.IsSearching ? Visibility.Visible : Visibility.Collapsed;
+
+    private void OnClearSearch(object sender, RoutedEventArgs e)
+    {
+        // 交给 TextBox 自己改文本：OnSearchChanged 会接手后续的查询、系统搜索和重绘。
+        // 直接清 _view.Query 会漏掉控件内容，下次输入时界面与状态就不一致了。
+        SearchBox.Clear();
+        SearchBox.Focus();
     }
 
     private void OnPreviousPage(object sender, RoutedEventArgs e) => NavigatePage(-1);

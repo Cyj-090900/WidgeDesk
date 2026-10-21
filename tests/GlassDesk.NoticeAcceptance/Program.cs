@@ -65,6 +65,27 @@ internal static class Program
             Add();
             Check("Adding the same source puts the tile back", grid.Children.Count == 1
                 && data.Library.Items.Count == 1 && status.Visibility == Visibility.Visible);
+
+            // 搜索框的一键清除：空查询时按钮藏起来，有内容才出现，点一下清空并收回按钮。
+            // 放在入库之后，这样"清空回到浏览视图"的断言才有区分度——此时浏览视图有 1 项。
+            // 关掉系统搜索：本机装的应用与索引文件会随防抖异步并入结果，数量不受本测试控制。
+            window.ApplySettings(new GlassDesk.Core.Models.Settings.LauncherSettings
+            {
+                SearchInstalledApps = false,
+                SearchFiles = false,
+            });
+            var clear = (Button)window.FindName("ClearSearchButton")!;
+            Check("Clear button is hidden while the search box is empty",
+                clear.Visibility == Visibility.Collapsed);
+            search.Text = "Test app";
+            Pump(300);
+            Check("Clear button appears once there is a query",
+                clear.Visibility == Visibility.Visible && grid.Children.Count == 1);
+            clear.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check("Clear button empties the search box and hides itself",
+                search.Text.Length == 0 && clear.Visibility == Visibility.Collapsed);
+            Check("Clearing returns the grid to the browse view", grid.Children.Count == 1);
+
             Pump(2400);
             Check("Feedback stays readable before three seconds", status.Visibility == Visibility.Visible);
             Pump(1000);

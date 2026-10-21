@@ -39,6 +39,40 @@
         <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".25" /></Trigger>
       </Style.Triggers>
     </Style>
+    <Style x:Key="LauncherSearchClear" TargetType="Button">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <!-- 不抢焦点、不进 Tab 序：键盘用户有全选删除和 Esc，这里多一个停靠点反而碍事。 -->
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Grid Background="Transparent">
+              <Ellipse x:Name="HoverRing" Fill="#26FFFFFF" Opacity="0" />
+              <Path x:Name="Glyph" Width="9" Height="9" Stretch="Uniform"
+                    Data="M1,1 L8,8 M8,1 L1,8"
+                    Stroke="{TemplateBinding Foreground}"
+                    StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
+                <Setter TargetName="Glyph" Property="Opacity" Value=".55" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style x:Key="LauncherAppTile" TargetType="Button">
       <Setter Property="Foreground" Value="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
       <Setter Property="Cursor" Value="Hand" />
@@ -113,10 +147,20 @@
         <controls:PhoneBorder Height="36" CornerRadius="18" Padding="11,0" Background="#0CFFFFFF"
                 BorderBrush="{Binding PanelBorderBrush, RelativeSource={RelativeSource AncestorType=Window}}"
                 BorderThickness="1" SnapsToDevicePixels="True">
-          <TextBox x:Name="SearchBox" Height="32" FontSize="15" VerticalContentAlignment="Center"
-                   Background="Transparent" BorderThickness="0" Padding="0"
-                   AutomationProperties.Name="搜索应用" ToolTip="搜索中文、英文、拼音或别名"
-                   TextChanged="OnSearchChanged" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchBox" Grid.Column="0" Height="32" FontSize="15" VerticalContentAlignment="Center"
+                     Background="Transparent" BorderThickness="0" Padding="0"
+                     AutomationProperties.Name="搜索应用" ToolTip="搜索中文、英文、拼音或别名"
+                     TextChanged="OnSearchChanged" />
+            <Button x:Name="ClearSearchButton" Grid.Column="1" Style="{StaticResource LauncherSearchClear}"
+                    Margin="6,0,0,0" Visibility="Collapsed"
+                    AutomationProperties.Name="清除搜索内容" ToolTip="清除搜索内容"
+                    Click="OnClearSearch" />
+          </Grid>
         </controls:PhoneBorder>
       </DockPanel>
       <Grid Grid.Row="1">
