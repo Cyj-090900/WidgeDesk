@@ -57,7 +57,12 @@ internal static class Program
             window.RefreshLibrary();
             Check("Production trash drop removes the launcher tile", grid.Children.Count == 0);
             search.Text = "Test app";
-            Check("A removed shortcut is absent from search", grid.Children.Count == 0);
+            // 移除只动启动台布局，不动应用库：条目仍在库里，所以搜索照样找得到它。
+            // 这一点是「再次添加能把磁贴放回原位」的前提——库里的记录还在，重新添加
+            // 只是把它重新放回布局。搜索覆盖整个库而不是只覆盖布局，是搜索框扩展时
+            // 有意改的（否则未导入的应用和任何文件都搜不到）。
+            Check("Search still finds a shortcut removed from the launcher",
+                grid.Children.Count == 1);
             search.Clear();
             Check("Trash preserves the pinned Dock item", data.Layouts.Dock.PinnedItemIds.Contains(entry.Id));
             Check("Saved layout has no hidden list", !File.ReadAllText(data.Paths.LauncherLayoutFile).Contains("excludedAppIds"));
