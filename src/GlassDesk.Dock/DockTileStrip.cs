@@ -128,10 +128,12 @@ public sealed class DockTileStrip : Border
     /// </summary>
     /// <remarks>
     /// 内置入口（启动台、显示桌面、回收站）固定在独立区域：不参与排序，
-    /// 也不能被拖出移除。排序提交时写进布局的就是这个列表。
+    /// 也不能被拖出移除。自动磁贴（此刻正在运行的）同样排除——它们不属于固定列表，
+    /// 拖它们没有意义，混进来还会让插入位置按错误的索引计算。
+    /// 排序提交时写进布局的就是这个列表。
     /// </remarks>
     public IReadOnlyList<string> ReorderCandidateIds =>
-        _models.Take(AppTileCount).Select(model => model.EntryId).ToList();
+        _models.Take(AppTileCount).Where(model => !model.IsAuto).Select(model => model.EntryId).ToList();
 
     /// <summary>应用磁贴的数量（磁贴行里前缀部分；其余是内置入口）。</summary>
     private int AppTileCount { get; set; }
@@ -222,8 +224,12 @@ public sealed class DockTileStrip : Border
 
         for (var index = 0; index < _models.Count; index++)
         {
-            // 只有应用磁贴挂拖拽处理器：内置入口不参与排序，也不能被拖出移除。
-            var draggable = index < AppTileCount;
+            // 只有「固定的应用磁贴」挂拖拽处理器：
+            //   · 内置入口不参与排序，也不能被拖出移除；
+            //   · 自动磁贴（此刻正在运行的）不属于固定列表，拖它会把 auto: 形式的
+            //     槽位 id 写进布局文件——那不是应用库条目，下一次加载就被当成陌生 id 清掉，
+            //     表现为「拖了但没反应，重启后回到原样」。
+            var draggable = index < AppTileCount && !_models[index].IsAuto;
             var tile = CreateTile(_models[index], draggable);
             _tiles.Add(tile);
             _ = _canvas.Children.Add(tile);

@@ -371,6 +371,12 @@ public partial class DockWindow : GlassWindow
     /// </summary>
     public int TileCount => _models.Count;
 
+    /// <summary>当前磁贴模型，按显示顺序。测试用它断言磁贴行的构成。</summary>
+    /// <remarks>
+    /// 只读视图：调用方拿不到内部列表本身，改不了 Dock 的状态。
+    /// </remarks>
+    public IReadOnlyList<DockTileModel> TileModels => _models;
+
     /// <summary>
     /// 把宿主建好的东西交给 Dock：应用服务入口、程序坞设置通知口与「切换启动台」回调。
     /// </summary>
@@ -463,10 +469,92 @@ public partial class DockWindow : GlassWindow
 
                 _models.Add(CreateTile(entry, settings, tracker!, dotBrush));
             }
+
+            // 自动磁贴排在固定项之后：用户自己排好的顺序不受运行情况影响。
+            foreach (var running in BuildAutoTiles())
+            {
+                _models.Add(CreateAutoTile(running, settings, dotBrush));
+            }
         }
 
         _tileStrip.SetTiles(_models);
         ApplyStripMetrics();
+    }
+
+    /// <summary>
+    /// 此刻应当自动出现在 Dock 上的运行中应用。
+    /// </summary>
+    /// <remarks>
+    /// 排除两类：已经固定的（避免同一应用出现两枚图标），以及用户明确移除过的
+    /// （见 <see cref="LayoutStore.SuppressAutoItem"/>）。
+    /// </remarks>
+    private IReadOnlyList<RunningApp> BuildAutoTiles()
+    {
+        if (_services is null)
+        {
+            return [];
+        }
+
+        var covered = _services.Layouts.Dock.PinnedItemIds.ToHashSet(StringComparer.Ordinal);
+        return _services.Running.BuildAutoTiles(covered, _services.Layouts.Dock.SuppressedAutoItemIds);
+    }
+
+    /// <summary>把一条运行中的应用造成磁贴模型。</summary>
+    private DockTileModel CreateAutoTile(RunningApp running, DockSettings settings, Brush? dotBrush)
+    {
+        var scale = DockScale;
+
+        return new DockTileModel
+        {
+            EntryId = running.Id,
+            IsAuto = true,
+            LaunchEntryId = running.EntryId,
+            LaunchTarget = running.Target,
+            Aumid = running.Aumid,
+            AutoIconSource = running.IconSource,
+            AutoCustomIconPath = running.CustomIconPath,
+            Windows = running.Windows,
+            DisplayName = running.DisplayName,
+            ToolTipText = running.DisplayName,
+            Icon = LoadAutoTileIcon(running),
+            DotBrush = dotBrush,
+            IconSize = DockSettings.FixedIconSize * scale,
+            TileMargin = new Thickness(DockSettings.FixedIconSpacing * scale / 2, 0, DockSettings.FixedIconSpacing * scale / 2, 0),
+            // 自动磁贴代表的就是「它正在运行」，状态点常亮——这正是它出现在这里的原因。
+            RunningVisibility = settings.ShowRunningIndicator ? Visibility.Visible : Visibility.Collapsed,
+        };
+    }
+
+    /// <summary>取自动磁贴的图标：用户自选图标优先，其次图标缓存。</summary>
+    /// <remarks>
+    /// 与库条目磁贴（<see cref="LoadTileIcon"/>）同一条优先级：用户特意给这个应用换过图标，
+    /// 自动出现的磁贴当然也该用它，否则同一个应用在固定前后长得不一样。
+    /// </remarks>
+    private BitmapImage? LoadAutoTileIcon(RunningApp running)
+    {
+        if (_services is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(running.CustomIconPath) && File.Exists(running.CustomIconPath))
+        {
+            return LoadBitmap(running.CustomIconPath);
+        }
+
+        if (string.IsNullOrWhiteSpace(running.IconSource))
+        {
+            return null;
+        }
+
+        var cached = _services.Icons.PathFor(running.IconSource);
+
+        if (!File.Exists(cached))
+        {
+            cached = _services.Icons.EnsureFor(running.IconSource)?.Path ?? cached;
+        }
+
+        return File.Exists(cached) ? LoadBitmap(cached) : null;
     }
 
     private DockTileModel CreateTile(AppEntry entry, DockSettings settings, RunningAppTracker tracker, Brush? dotBrush)
@@ -632,6 +720,15 @@ public partial class DockWindow : GlassWindow
             return;
         }
 
+        // 自动磁贴：它代表一个正在运行的应用，点击的意图是「把它调到前面」。
+        // 对应库条目存在时走激活；不存在（例如库外的后台进程）时按目标老实启动，
+        // 由应用自己决定是开新窗口还是前置已有窗口。
+        if (RunningAppCatalog.IsAutoTile(entryId))
+        {
+            ActivateAutoTile(entryId);
+            return;
+        }
+
         var entry = _services.Library.Find(entryId);
 
         if (entry is not null && entry.Kind == AppItemKind.Folder && !entry.IsTargetMissing)
@@ -655,6 +752,40 @@ public partial class DockWindow : GlassWindow
             default:
                 // Activated / Launched 不需要额外反馈：窗口到前台或应用启动本身就是反馈。
                 break;
+        }
+    }
+
+    /// <summary>激活一枚自动磁贴：已有库条目就激活它，否则按目标启动。</summary>
+    private void ActivateAutoTile(string autoId)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var model = _models.FirstOrDefault(tile => string.Equals(tile.EntryId, autoId, StringComparison.Ordinal));
+
+        if (model is null)
+        {
+            return;
+        }
+
+        if (model.LaunchEntryId is { } entryId && _services.Library.Find(entryId) is not null)
+        {
+            OnTileClicked(this, entryId);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(model.LaunchTarget))
+        {
+            return;
+        }
+
+        var opened = ShellExecutor.Open(model.LaunchTarget, null, null);
+
+        if (!opened.Started)
+        {
+            ShowFailureNotice($"{model.DisplayName} 未能打开。");
         }
     }
 
@@ -826,6 +957,14 @@ public partial class DockWindow : GlassWindow
             return;
         }
 
+        // 自动磁贴：菜单只有「退出程序」与「从 Dock 移除」两项。它不在应用库里，
+        // 「打开」「重新定位」这些针对库条目的动作对它没有意义。
+        if (RunningAppCatalog.IsAutoTile(entryId))
+        {
+            ShowAutoTileContextMenu(entryId);
+            return;
+        }
+
         var entry = _services.Library.Find(entryId);
 
         if (entry is null)
@@ -868,6 +1007,132 @@ public partial class DockWindow : GlassWindow
 
         _ = WindowActivation.TryBringToForeground(Handle);
         menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// 自动磁贴的右键菜单：打开（前置）、退出程序、从 Dock 移除。
+    /// </summary>
+    /// <remarks>
+    /// 与库条目磁贴共用同一套前台处理：主栏带 <c>WS_EX_NOACTIVATE</c>，
+    /// 打开菜单前必须显式把它调到前台，否则点击菜单外部不会收起菜单。
+    /// </remarks>
+    private void ShowAutoTileContextMenu(string autoId)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var model = _models.FirstOrDefault(tile => string.Equals(tile.EntryId, autoId, StringComparison.Ordinal));
+
+        if (model is null)
+        {
+            return;
+        }
+
+        _autoHide?.PushSuppress(DateTime.UtcNow);
+
+        var menu = new ContextMenu
+        {
+            Placement = PlacementMode.MousePoint,
+        };
+        var foregroundBefore = WindowControl.GetForegroundWindow();
+        nint menuHandle = 0;
+        menu.Opened += (_, _) => menuHandle = (PresentationSource.FromVisual(menu) as System.Windows.Interop.HwndSource)?.Handle ?? 0;
+
+        _ = menu.Items.Add(MenuItem("打开", () => ActivateAutoTile(autoId)));
+
+        // 一个窗口都没有的自动项不该出现（它正是因为有窗口才在这里），
+        // 但真出现了也不给一个点了没反应的菜单项。
+        if (model.Windows.Count > 0)
+        {
+            _ = menu.Items.Add(MenuItem("退出程序", () => QuitAutoTile(model)));
+        }
+
+        _ = menu.Items.Add(new Separator());
+        _ = menu.Items.Add(MenuItem("从 Dock 移除", () => RemoveAutoTile(model)));
+
+        menu.Closed += (_, _) =>
+        {
+            _autoHide?.PopSuppress(DateTime.UtcNow);
+            RestorePopupForeground(foregroundBefore, menuHandle);
+        };
+
+        _ = WindowActivation.TryBringToForeground(Handle);
+        menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// 退出这个应用：对它的每个窗口投递 <c>WM_CLOSE</c>。
+    /// </summary>
+    /// <remarks>
+    /// <b>逐窗口关闭，不结束进程。</b>关闭走的是窗口自己的流程，因此「是否保存」
+    /// 这类询问会照常出现；按进程结束会直接丢掉用户的未保存内容。
+    ///
+    /// <para>
+    /// 不在这里等结果：应用可能要几秒才退干净（弹了保存询问就更久）。
+    /// 图标由下一次窗口事件触发的调和自动收走——这正是「彻底关闭后自动消失」的实现。
+    /// 为了让用户马上看到反馈，紧接着主动调和一次窗口集合。
+    /// </para>
+    /// </remarks>
+    private void QuitAutoTile(DockTileModel model)
+    {
+        var closed = 0;
+
+        foreach (var window in model.Windows)
+        {
+            if (WindowControl.Close(window))
+            {
+                closed++;
+            }
+        }
+
+        if (closed == 0)
+        {
+            ShowFailureNotice($"{model.DisplayName} 已经没有可关闭的窗口。");
+            _services?.Running.Reconcile();
+            return;
+        }
+
+        ShowTemporaryNotice($"正在退出 {model.DisplayName}…");
+
+        // 关闭是异步的：让窗口事件有机会先到，再调和一次兜底——
+        // 某些应用的窗口消失不会触发我们监听的事件。
+        _services?.Running.Reconcile();
+    }
+
+    /// <summary>
+    /// 把一枚自动磁贴从 Dock 上移除。
+    /// </summary>
+    /// <remarks>
+    /// 必须记下「用户移除过它」，否则下一次调和发现应用还在运行会立刻把图标加回来，
+    /// 用户看到的是菜单点了没反应。应用真的关掉之后这条记录自动作废。
+    ///
+    /// <para>
+    /// 只影响自动项：用户亲手固定的图标走的是 <see cref="OnUnpinRequested"/>，
+    /// 两者互不干扰。
+    /// </para>
+    /// </remarks>
+    private void RemoveAutoTile(DockTileModel model)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        _services.Layouts.SuppressAutoItem(model.EntryId);
+
+        try
+        {
+            _services.Layouts.SaveDock();
+        }
+        catch (StorageException)
+        {
+            // 写不进去时它可能在下一次调和后重新出现，如实提示而不是假装成功。
+            ShowFailureNotice("未能记住这次移除；应用仍在运行时它可能再次出现。");
+        }
+
+        RefreshTiles();
     }
 
     /// <summary>重新定位对话框：选一个真实存在的新目标，交给维护服务。</summary>
@@ -1120,13 +1385,89 @@ public partial class DockWindow : GlassWindow
 
             foreach (var tile in _models)
             {
+                // 自动磁贴代表的就是「正在运行」，它的状态点常亮，不参与这一轮判定。
+                if (tile.IsAuto)
+                {
+                    continue;
+                }
+
                 var entry = _services.Library.Find(tile.EntryId);
 
                 tile.RunningVisibility = entry is not null && _services.Running.IsRunning(entry)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
+
+            // 自动磁贴的增删要重建整行（新应用出现、旧应用彻底关掉），
+            // 而上面那种只改可见性的做法覆盖不了。空闲时再重建，避免拖拽或动画中途换控件。
+            SyncAutoTiles();
         });
+    }
+
+    /// <summary>
+    /// 把自动磁贴对齐到当前真实的运行情况：多出来的加进来，已经关掉的去掉。
+    /// </summary>
+    /// <remarks>
+    /// <b>只在集合真的变了时才重建。</b>调和由窗口事件触发，而窗口标题变化、
+    /// 焦点切换都可能触发它；每次都重建整行会让图标闪烁、正在放大的动画被打断。
+    /// 比较用槽位 id 的有序序列：内容与顺序都一样就什么都不做。
+    /// </remarks>
+    private void SyncAutoTiles()
+    {
+        if (_services is null || _performanceSleepRequested)
+        {
+            return;
+        }
+
+        var desired = BuildAutoTiles().Select(app => app.Id).ToList();
+        var current = _models.Where(tile => tile.IsAuto).Select(tile => tile.EntryId).ToList();
+
+        if (desired.SequenceEqual(current, StringComparer.Ordinal))
+        {
+            ForgetClosedSuppressions(desired);
+            return;
+        }
+
+        ForgetClosedSuppressions(desired);
+        RefreshTiles();
+    }
+
+    /// <summary>
+    /// 清掉「已经不再运行」的移除记录，让那个应用下次再开时能重新出现。
+    /// </summary>
+    /// <remarks>
+    /// 只在真的清掉了记录时才写盘：调和很频繁，每次都写文件既没必要，
+    /// 也会让布局文件的修改时间不停地变。
+    /// </remarks>
+    private void ForgetClosedSuppressions(IReadOnlyCollection<string> stillRunning)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var stillSuppressed = _services.Layouts.Dock.SuppressedAutoItemIds
+            .Where(stillRunning.Contains)
+            .ToList();
+
+        if (stillSuppressed.Count == _services.Layouts.Dock.SuppressedAutoItemIds.Count)
+        {
+            return;
+        }
+
+        if (!_services.Layouts.RetainSuppressedAutoItems(stillSuppressed))
+        {
+            return;
+        }
+
+        try
+        {
+            _services.Layouts.SaveDock();
+        }
+        catch (StorageException)
+        {
+            // 写不进去只是让那个应用下次仍然不出现，不影响本次会话的界面；不改动界面。
+        }
     }
 
     // ---- 通知与刷新 ----

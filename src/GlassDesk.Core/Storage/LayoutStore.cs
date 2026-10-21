@@ -49,6 +49,7 @@ public sealed class LayoutStore
         var outcome = _dockStore.Load(static () => new DockLayout());
         Dock = outcome.Value;
         Dock.PinnedItemIds ??= [];
+        Dock.SuppressedAutoItemIds ??= [];
         _lastSavedDockPins = [.. Dock.PinnedItemIds];
         return outcome;
     }
@@ -78,6 +79,44 @@ public sealed class LayoutStore
             Dock.PinnedItemIds = [.. _lastSavedDockPins];
             throw;
         }
+    }
+
+    /// <summary>
+    /// 记下「用户从 Dock 上移除了这个自动项」，让它在本次运行内不再自动出现。
+    /// </summary>
+    /// <remarks>
+    /// 用户移除一个正在运行的应用时，若只从当前列表里删掉，下一次调和发现它仍在运行、
+    /// 会立刻把图标加回来——菜单看起来点了没反应。这条记录解决的就是那件事。
+    /// 应用真的关掉之后由 <see cref="ForgetSuppressedAutoItem"/> 清掉。
+    /// </remarks>
+    public void SuppressAutoItem(string? itemId)
+    {
+        if (string.IsNullOrEmpty(itemId))
+        {
+            return;
+        }
+
+        if (Dock.SuppressedAutoItemIds.Contains(itemId, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        Dock.SuppressedAutoItemIds.Add(itemId);
+    }
+
+    /// <summary>
+    /// 应用已经不在运行，忘掉它被移除过的事实，下次再运行时可以重新出现。
+    /// </summary>
+    /// <returns>是否真的移除了记录（调用方据此决定要不要写盘）。</returns>
+    public bool ForgetSuppressedAutoItem(string itemId)
+        => Dock.SuppressedAutoItemIds.RemoveAll(id => string.Equals(id, itemId, StringComparison.Ordinal)) > 0;
+
+    /// <summary>只保留这些 id 对应的移除记录；不在其中的视为「已经不再运行」。</summary>
+    /// <returns>是否发生了变化（调用方据此决定要不要写盘）。</returns>
+    public bool RetainSuppressedAutoItems(IReadOnlyCollection<string> stillRunning)
+    {
+        ArgumentNullException.ThrowIfNull(stillRunning);
+        return Dock.SuppressedAutoItemIds.RemoveAll(id => !stillRunning.Contains(id)) > 0;
     }
 
     /// <exception cref="StorageException">文件无法写入。</exception>

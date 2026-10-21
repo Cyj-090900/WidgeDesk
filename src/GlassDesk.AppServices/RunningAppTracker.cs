@@ -93,6 +93,23 @@ public sealed class RunningAppTracker : IDisposable
     }
 
     /// <summary>
+    /// 直接设定窗口快照，跳过真实枚举。
+    /// </summary>
+    /// <remarks>
+    /// 仅供测试：自动磁贴的归纳规则要在一个**确定的**窗口集合上断言，
+    /// 而真实桌面有几十个窗口、内容随机器而变。生产代码从不调用它。
+    /// </remarks>
+    internal void ApplySnapshotForTesting(IReadOnlyList<WindowIdentityInfo> windows)
+    {
+        lock (_sync)
+        {
+            _windows = windows;
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
     /// 启动跟踪：先做初始枚举，再装事件钩子。
     /// </summary>
     /// <remarks>
@@ -163,6 +180,30 @@ public sealed class RunningAppTracker : IDisposable
         ArgumentNullException.ThrowIfNull(entry);
 
         return WindowMatcher.MatchWindows(entry, LastWindows, WindowMatcher.ResolveAumid(entry, _identityCache));
+    }
+
+    /// <summary>
+    /// 归纳出此刻正在运行、可以放到 Dock 上的应用。
+    /// </summary>
+    /// <param name="coveredEntryIds">已经有磁贴在 Dock 上的条目 id（通常是固定项）。</param>
+    /// <param name="suppressedAutoIds">被用户从 Dock 上移除过、本次不再出现的自动项 id。</param>
+    /// <remarks>
+    /// 与状态点读同一份窗口快照，因此两者永远不会互相矛盾——图标在、点却是灰的
+    /// 那种不一致不会发生。归纳规则见 <see cref="RunningAppCatalog"/>。
+    /// </remarks>
+    public IReadOnlyList<RunningApp> BuildAutoTiles(
+        IReadOnlyCollection<string> coveredEntryIds,
+        IReadOnlyCollection<string> suppressedAutoIds)
+    {
+        IReadOnlyList<WindowIdentityInfo> snapshot;
+
+        lock (_sync)
+        {
+            snapshot = _windows;
+        }
+
+        return RunningAppCatalog.Build(
+            snapshot, _library, coveredEntryIds, suppressedAutoIds, (uint)Environment.ProcessId);
     }
 
     /// <summary>
