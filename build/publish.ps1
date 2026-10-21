@@ -1,4 +1,4 @@
-# Produces a self-contained Windows x64 build of Widge.
+# Produces a self-contained Windows x64 build of GlassDesk.
 #
 # ASCII only on purpose: Windows PowerShell 5.1 reads a .ps1 without a BOM using the system
 # ANSI code page, so non-ASCII text in this file would fail to parse on a Chinese-locale
@@ -53,8 +53,8 @@ function Resolve-Dotnet {
         return $Explicit
     }
 
-    if ($env:WIDGE_DOTNET -and (Test-Path $env:WIDGE_DOTNET)) {
-        return $env:WIDGE_DOTNET
+    if ($env:GLASSDESK_DOTNET -and (Test-Path $env:GLASSDESK_DOTNET)) {
+        return $env:GLASSDESK_DOTNET
     }
 
     $known = 'D:\dotnet10\dotnet.exe'
@@ -63,7 +63,7 @@ function Resolve-Dotnet {
     $onPath = Get-Command dotnet -ErrorAction SilentlyContinue
     if ($onPath) { return $onPath.Source }
 
-    throw 'No .NET SDK found. Pass -DotnetPath, set WIDGE_DOTNET, or install the SDK.'
+    throw 'No .NET SDK found. Pass -DotnetPath, set GLASSDESK_DOTNET, or install the SDK.'
 }
 
 $dotnet = Resolve-Dotnet -Explicit $DotnetPath
@@ -133,7 +133,7 @@ function Assert-SafePublishTarget {
     $overlaps = $resolved.Equals($protected, [System.StringComparison]::OrdinalIgnoreCase) -or
         $resolved.StartsWith(($protected + '\'), [System.StringComparison]::OrdinalIgnoreCase) -or
         $protected.StartsWith(($resolved + '\'), [System.StringComparison]::OrdinalIgnoreCase)
-    if ($overlaps) { throw "Publish output overlaps the current user's Widge data directory: '$resolved'." }
+    if ($overlaps) { throw "Publish output overlaps the current user's GlassDesk data directory: '$resolved'." }
     $existingTarget = Get-Item -LiteralPath $resolved -Force -ErrorAction SilentlyContinue
     if ($null -ne $existingTarget) { throw "Publish output already exists; choose a fresh directory: '$resolved'." }
 
@@ -212,7 +212,7 @@ function Get-VersionOverrideArguments {
 
 Push-Location $repoRoot
 try {
-    $protectedDataRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)) 'Widge'
+    $protectedDataRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)) 'GlassDesk'
     Assert-SafePublishTarget -Path $OutputDirectory -ProtectedDataRoot $protectedDataRoot -RepositoryRoot $repoRoot
     Assert-SafeEvidenceDirectory -Path $EvidenceDirectory -RepositoryRoot $repoRoot
     $evidencePath = [System.IO.Path]::GetFullPath($EvidenceDirectory)
@@ -220,7 +220,7 @@ try {
     $runEvidenceDirectory = Join-Path $evidencePath ("acceptance-" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $runEvidenceDirectory | Out-Null
     if (-not $AcceptanceDataRoot) {
-        $AcceptanceDataRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("Widge-publish-selftest-" + [guid]::NewGuid().ToString('N'))
+        $AcceptanceDataRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("GlassDesk-publish-selftest-" + [guid]::NewGuid().ToString('N'))
     }
     Assert-SafeAcceptanceDataRoot -Path $AcceptanceDataRoot
     $acceptanceDataRoot = [System.IO.Path]::GetFullPath($AcceptanceDataRoot)
@@ -231,7 +231,7 @@ try {
     # ReadyToRun trades a little size for noticeably faster cold start, which matters for a
     # utility the user launches at logon.
     $publishArguments = @(
-        'publish', 'src/Widge.App/Widge.App.csproj',
+        'publish', 'src/GlassDesk.App/GlassDesk.App.csproj',
         '-c', $Configuration,
         '-r', 'win-x64',
         '--self-contained', 'true',
@@ -250,8 +250,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/third-party/unicode-license-v3.txt') `
         -Destination (Join-Path $OutputDirectory 'UNICODE-LICENSE.txt') -Force
 
-    $exe = Join-Path $OutputDirectory 'Widge.exe'
-    if (-not (Test-Path $exe)) { throw "Expected Widge.exe was not produced." }
+    $exe = Join-Path $OutputDirectory 'GlassDesk.exe'
+    if (-not (Test-Path $exe)) { throw "Expected GlassDesk.exe was not produced." }
 
     $size = (Get-ChildItem $OutputDirectory -Recurse -File | Measure-Object -Property Length -Sum).Sum
     $fileCount = (Get-ChildItem $OutputDirectory -Recurse -File).Count

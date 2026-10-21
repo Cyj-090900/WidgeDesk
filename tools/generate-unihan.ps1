@@ -1,5 +1,5 @@
 # Generates the embedded offline Mandarin reading map from pinned Unicode 17.0.0 data.
-param([string]$ZipPath = (Join-Path $env:TEMP 'Widge-Unihan-17.0.0.zip'))
+param([string]$ZipPath = (Join-Path $env:TEMP 'GlassDesk-Unihan-17.0.0.zip'))
 $ErrorActionPreference = 'Stop'
 $expected = 'F7A48B2B545ACFAA77B2D607AE28747404CE02BAEFEE16396C5D2D7A8EF34B5E'
 if (-not (Test-Path -LiteralPath $ZipPath)) { Invoke-WebRequest 'https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip' -OutFile $ZipPath }
@@ -19,7 +19,7 @@ try {
             $lines.Add("$($Matches[1])`t$($plain.ToLowerInvariant())")
         }
     } finally { $reader.Dispose() }
-    $target = Join-Path $PSScriptRoot '..\src\Widge.AppServices\Resources\unihan-mandarin-17.txt'
+    $target = Join-Path $PSScriptRoot '..\src\GlassDesk.AppServices\Resources\unihan-mandarin-17.txt'
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($target))) | Out-Null
     [IO.File]::WriteAllLines([IO.Path]::GetFullPath($target), $lines, [Text.UTF8Encoding]::new($false))
     Write-Host "Generated $($lines.Count) readings: $target"

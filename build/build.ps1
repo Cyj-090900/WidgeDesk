@@ -1,4 +1,4 @@
-# Builds the Widge solution and runs its tests.
+# Builds the GlassDesk solution and runs its tests.
 #
 # ASCII only on purpose: Windows PowerShell 5.1 reads a .ps1 without a BOM using the system
 # ANSI code page, so non-ASCII text in this file would fail to parse on a Chinese-locale
@@ -7,7 +7,7 @@
 # The SDK is resolved in this order, so the script works both on this machine (where the SDK
 # lives outside the project tree) and anywhere a suitable SDK is on PATH:
 #   1. -DotnetPath
-#   2. the WIDGE_DOTNET environment variable
+#   2. the GLASSDESK_DOTNET environment variable
 #   3. D:\dotnet10\dotnet.exe
 #   4. dotnet on PATH
 
@@ -22,7 +22,7 @@ param(
     [switch]$UiAcceptance,
     # Desktop acceptance injects REAL mouse and keyboard events through SendInput, so it is
     # only allowed on an isolated desktop: a dedicated test account or a virtual machine.
-    # It refuses to send anything unless WIDGE_ISOLATED_DESKTOP=1 is set, and that
+    # It refuses to send anything unless GLASSDESK_ISOLATED_DESKTOP=1 is set, and that
     # refusal is a blocked run (exit code 2), never a pass.
     [switch]$DesktopAcceptance,
     [int]$DesktopRepeat = 3,
@@ -47,8 +47,8 @@ function Resolve-Dotnet {
         return $Explicit
     }
 
-    if ($env:WIDGE_DOTNET -and (Test-Path $env:WIDGE_DOTNET)) {
-        return $env:WIDGE_DOTNET
+    if ($env:GLASSDESK_DOTNET -and (Test-Path $env:GLASSDESK_DOTNET)) {
+        return $env:GLASSDESK_DOTNET
     }
 
     $known = 'D:\dotnet10\dotnet.exe'
@@ -57,17 +57,17 @@ function Resolve-Dotnet {
     $onPath = Get-Command dotnet -ErrorAction SilentlyContinue
     if ($onPath) { return $onPath.Source }
 
-    throw 'No .NET SDK found. Pass -DotnetPath, set WIDGE_DOTNET, or install the SDK.'
+    throw 'No .NET SDK found. Pass -DotnetPath, set GLASSDESK_DOTNET, or install the SDK.'
 }
 
 function Get-TestProjects {
     param([switch]$IncludeWpf)
 
     $projects = @(
-        'tests/Widge.Core.Tests/Widge.Core.Tests.csproj',
-        'tests/Widge.AppServices.Tests/Widge.AppServices.Tests.csproj'
+        'tests/GlassDesk.Core.Tests/GlassDesk.Core.Tests.csproj',
+        'tests/GlassDesk.AppServices.Tests/GlassDesk.AppServices.Tests.csproj'
     )
-    if ($IncludeWpf) { $projects += 'tests/Widge.Dock.Tests/Widge.Dock.Tests.csproj' }
+    if ($IncludeWpf) { $projects += 'tests/GlassDesk.Dock.Tests/GlassDesk.Dock.Tests.csproj' }
     return $projects
 }
 
@@ -81,15 +81,15 @@ function Test-InteractiveAcceptanceAllowed {
     return ($InteractiveAcceptance -and $IsolationFlag -eq '1')
 }
 
-if (-not (Test-DesktopAcceptanceAllowed -DesktopAcceptance:$DesktopAcceptance -IsolationFlag:$env:WIDGE_ISOLATED_DESKTOP)) {
+if (-not (Test-DesktopAcceptanceAllowed -DesktopAcceptance:$DesktopAcceptance -IsolationFlag:$env:GLASSDESK_ISOLATED_DESKTOP)) {
     Write-Host 'Blocked: desktop acceptance needs an isolated desktop.' -ForegroundColor Yellow
-    Write-Host 'Run it inside the test virtual machine and set WIDGE_ISOLATED_DESKTOP=1 first.' -ForegroundColor Yellow
+    Write-Host 'Run it inside the test virtual machine and set GLASSDESK_ISOLATED_DESKTOP=1 first.' -ForegroundColor Yellow
     exit 2
 }
 
-if ($InteractiveAcceptance -and -not (Test-InteractiveAcceptanceAllowed -InteractiveAcceptance:$InteractiveAcceptance -IsolationFlag:$env:WIDGE_ISOLATED_DESKTOP)) {
+if ($InteractiveAcceptance -and -not (Test-InteractiveAcceptanceAllowed -InteractiveAcceptance:$InteractiveAcceptance -IsolationFlag:$env:GLASSDESK_ISOLATED_DESKTOP)) {
     Write-Host 'Blocked: Phase 3/4 acceptance needs an isolated desktop.' -ForegroundColor Yellow
-    Write-Host 'Pass -InteractiveAcceptance inside the test virtual machine with WIDGE_ISOLATED_DESKTOP=1.' -ForegroundColor Yellow
+    Write-Host 'Pass -InteractiveAcceptance inside the test virtual machine with GLASSDESK_ISOLATED_DESKTOP=1.' -ForegroundColor Yellow
     exit 2
 }
 
@@ -171,7 +171,7 @@ function Assert-SafeEvidenceDirectory {
 
 function New-AcceptanceDataRoot {
     param([string]$Label)
-    Join-Path ([System.IO.Path]::GetTempPath()) ("Widge-build-" + $Label + "-" + [guid]::NewGuid().ToString('N'))
+    Join-Path ([System.IO.Path]::GetTempPath()) ("GlassDesk-build-" + $Label + "-" + [guid]::NewGuid().ToString('N'))
 }
 
 # global.json pins the SDK, but it can only reject a mismatch, not explain it. Report the
@@ -192,7 +192,7 @@ try {
     Write-Host ''
     Write-Host "== build ($Configuration) ==" -ForegroundColor Cyan
 
-    & $dotnet build 'Widge.slnx' -c $Configuration --nologo
+    & $dotnet build 'GlassDesk.slnx' -c $Configuration --nologo
     if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
     if (-not $SkipTests) {
@@ -215,7 +215,7 @@ try {
     # The self-check is the automated form of the "starts and exits cleanly" requirement: it
     # reports the OS build, which glass capabilities are available, where data is stored, and
     # whether that data is healthy. Exit code 0 means every check passed.
-    $selfTest = Join-Path $repoRoot "src/Widge.App/bin/$Configuration/net10.0-windows/Widge.exe"
+    $selfTest = Join-Path $repoRoot "src/GlassDesk.App/bin/$Configuration/net10.0-windows/GlassDesk.exe"
     if (Test-Path $selfTest) {
         $selfTestExit = Invoke-WaitingProcess -FilePath $selfTest -WorkingDirectory $repoRoot -Arguments @(
             '--selftest', '--acceptance-data-root', (New-AcceptanceDataRoot 'selftest'),
@@ -277,13 +277,13 @@ try {
         # Run the current phase's launcher acceptance first so an unrelated environment
         # blocker in the accumulated Dock regression cannot prevent its evidence from being
         # produced.
-        & $dotnet run --project 'tests/Widge.LauncherAcceptance' -c $Configuration -- --report (Join-Path $runEvidenceDirectory 'phase5-wpf.json')
+        & $dotnet run --project 'tests/GlassDesk.LauncherAcceptance' -c $Configuration -- --report (Join-Path $runEvidenceDirectory 'phase5-wpf.json')
         if ($LASTEXITCODE -ne 0) { throw "Launcher UI integration acceptance failed (exit code $LASTEXITCODE)." }
 
-        & $dotnet run --project 'tests/Widge.UiAcceptance' -c $Configuration -- --report (Join-Path $runEvidenceDirectory 'phase4-ui-regression.json')
+        & $dotnet run --project 'tests/GlassDesk.UiAcceptance' -c $Configuration -- --report (Join-Path $runEvidenceDirectory 'phase4-ui-regression.json')
         if ($LASTEXITCODE -ne 0) { throw "UI integration acceptance failed (exit code $LASTEXITCODE)." }
 
-        & $dotnet run --project 'tests/Widge.InteractionAcceptance' -c $Configuration -- --report (Join-Path $runEvidenceDirectory 'phase6-wpf.json')
+        & $dotnet run --project 'tests/GlassDesk.InteractionAcceptance' -c $Configuration -- --report (Join-Path $runEvidenceDirectory 'phase6-wpf.json')
         if ($LASTEXITCODE -ne 0) { throw "Phase 6 WPF acceptance failed (exit code $LASTEXITCODE)." }
     }
 
@@ -291,7 +291,7 @@ try {
         Write-Host ''
         Write-Host '== desktop acceptance (real input) ==' -ForegroundColor Cyan
 
-        & $dotnet run --project 'tests/Widge.DesktopAcceptance' -c $Configuration -- `
+        & $dotnet run --project 'tests/GlassDesk.DesktopAcceptance' -c $Configuration -- `
             --i-am-on-isolated-desktop `
             --repeat $DesktopRepeat `
             --report $DesktopReport

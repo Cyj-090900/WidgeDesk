@@ -3,7 +3,7 @@ Add-Type -TypeDefinition @'
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
-public static class WidgeShaderCompiler {
+public static class GlassDeskShaderCompiler {
     [ComImport, Guid("8BA5FB08-5195-40e2-AC58-0D989C3A0102"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface Blob { [PreserveSig] IntPtr GetBufferPointer(); [PreserveSig] UIntPtr GetBufferSize(); }
     [DllImport("d3dcompiler_47.dll", CallingConvention=CallingConvention.StdCall)]
@@ -27,5 +27,5 @@ public static class WidgeShaderCompiler {
     }
 }
 '@
-$shaderRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'src/Widge.UI/Effects'
-[WidgeShaderCompiler]::Compile((Join-Path $shaderRoot 'TransitionGlass.hlsl'), (Join-Path $shaderRoot 'TransitionGlass.ps'))
+$shaderRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'src/GlassDesk.UI/Effects'
+[GlassDeskShaderCompiler]::Compile((Join-Path $shaderRoot 'TransitionGlass.hlsl'), (Join-Path $shaderRoot 'TransitionGlass.ps'))
