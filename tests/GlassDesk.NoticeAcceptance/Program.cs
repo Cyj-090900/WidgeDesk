@@ -86,6 +86,38 @@ internal static class Program
                 search.Text.Length == 0 && clear.Visibility == Visibility.Collapsed);
             Check("Clearing returns the grid to the browse view", grid.Children.Count == 1);
 
+            // 打开搜索结果后自动入库：驱动真实代码路径，断言库和布局都变了。
+            // 走反射调私有方法而不是调 LaunchSystemResult，是因为后者会真的 ShellExecute
+            // 把计算器拉起来——自动化测试不该启动用户的程序。
+            var libraryBefore = data.Library.Items.Count;
+            var add = typeof(LauncherWindow).GetMethod("AddOpenedResultToLauncher",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            add.Invoke(window, [new GlassDesk.AppServices.SystemSearchResult
+            {
+                Kind = GlassDesk.AppServices.SystemSearchKind.App,
+                DisplayName = "计算器",
+                Target = @"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+                AppUserModelId = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+            }]);
+            var opened = data.Library.Items.SingleOrDefault(item => item?.DisplayName == "计算器");
+            Check("Opening a search result adds it to the library",
+                data.Library.Items.Count == libraryBefore + 1 && opened is not null);
+            Check("The opened app carries its shell identity",
+                opened?.AppUserModelId == "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
+            Check("The opened app lands in the launcher layout",
+                opened is not null
+                && GlassDesk.Core.Models.LauncherLayoutRules.AppIds(data.Layouts.Launcher).Contains(opened.Id));
+            // 文件不该被收进启动台：那会把网格塞满一次性的东西。
+            var afterApp = data.Library.Items.Count;
+            add.Invoke(window, [new GlassDesk.AppServices.SystemSearchResult
+            {
+                Kind = GlassDesk.AppServices.SystemSearchKind.File,
+                DisplayName = "随手打开的文件.txt",
+                Target = Path.Combine(root, "随手打开的文件.txt"),
+            }]);
+            Check("Opening a file does not grow the library",
+                data.Library.Items.Count == afterApp);
+
             Pump(2400);
             Check("Feedback stays readable before three seconds", status.Visibility == Visibility.Visible);
             Pump(1000);

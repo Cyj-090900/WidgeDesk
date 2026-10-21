@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows.Threading;
 using GlassDesk.AppServices;
 using GlassDesk.Core.Models;
@@ -11,7 +13,8 @@ namespace GlassDesk.Launcher;
 /// <remarks>
 /// 这类结果<strong>不在应用库中</strong>，所以它们的槽位 id 带一个前缀
 /// （<see cref="SystemTilePrefix"/>），渲染、点击与右键菜单据此分流。
-/// 只有用户按下「添加到启动台」之后，条目才真正进入应用库。
+/// 条目进入应用库有两条路：右键「添加到启动台」，或者直接打开它——打开一个应用
+/// 就说明用户要用它，于是自动收进启动台（文件不收录，见 <c>LaunchSystemResult</c>）。
 ///
 /// <para>
 /// <b>查询必须防抖并放到后台。</b>索引查询是跨进程的，每敲一个字就同步查一次
@@ -212,8 +215,18 @@ public partial class LauncherWindow
     /// </summary>
     /// <remarks>
     /// 走外壳同一条路：应用是 <c>shell:AppsFolder\&lt;AUMID&gt;</c>、
-    /// 文件是完整路径，两者 <c>ShellExecute</c> 都认。这里刻意<strong>不入库</strong>——
-    /// 用户只是搜一下用一次，库应当仍由「添加」和拖入显式维护。
+    /// 文件是完整路径，两者 <c>ShellExecute</c> 都认。
+    ///
+    /// <para>
+    /// <b>应用打开后自动收进启动台。</b>用户特意搜到它、又点开它，这就是「我常用它」的
+    /// 意思；下次他想再打开时，不必重新搜一遍。<strong>文件不收录</strong>——文件多半是
+    /// 一次性查看，把每个打开过的文件都塞进启动台只会把它撑满。
+    /// </para>
+    ///
+    /// <para>
+    /// 顺序是<b>先启动、后入库</b>。用户的意图是打开它，那个动作不该被任何写入动作挡在
+    /// 后面：入库失败最多是少一条记录，不该让程序打不开。
+    /// </para>
     /// </remarks>
     private void LaunchSystemResult(SystemSearchResult result)
     {
@@ -221,12 +234,53 @@ public partial class LauncherWindow
 
         var outcome = GlassDesk.Platform.Shell.ShellExecutor.Open(result.Target);
 
-        if (outcome.Started) CloseWithTransition();
-        else ShowNotice(outcome.IsFileNotFound
+        if (!outcome.Started)
+        {
+            ShowNotice(outcome.IsFileNotFound
             ? $"目标已不在原处：{result.DisplayName}"
             : outcome.IsNoAssociation
                 ? $"不知道用什么程序打开：{result.DisplayName}"
                 : $"{result.DisplayName} 未能打开。");
+            return;
+        }
+
+        AddOpenedResultToLauncher(result);
+        CloseWithTransition();
+    }
+
+    /// <summary>
+    /// 把刚打开的应用收进启动台。文件会被忽略（见下）。
+    /// </summary>
+    /// <remarks>
+    /// <b>只收应用。</b>文件多半是一次性查看，把每个打开过的文件都塞进启动台只会把它撑满。
+    /// 判断放在这里而不是调用方，是为了让这个方法自己就是安全的——将来多一个调用点，
+    /// 也不会因为忘了判断而把文件收进去。
+    ///
+    /// <para>
+    /// 写入失败<strong>不打断启动</strong>：这里只记录提示，异常不往上抛。窗口马上就要
+    /// 收起了，弹一个错误框去质问用户「要不要重试」既不合适、也没法处理。
+    /// </para>
+    ///
+    /// <para>
+    /// 这里刻意<strong>不</strong>重建磁贴：<see cref="ImportService.AddInstalledApp"/> 已经把
+    /// 新条目写进库与布局并落盘，而窗口正在收起，重建出来的磁贴一帧也不会被看到。
+    /// 下次打开启动台时 PrepareToShow 会重新渲染。
+    /// </para>
+    /// </remarks>
+    private void AddOpenedResultToLauncher(SystemSearchResult result)
+    {
+        if (_services is null || result.Kind != SystemSearchKind.App) return;
+
+        try
+        {
+            var entry = AppEntryFactory.CreateFromInstalledApp(
+                result.DisplayName, result.Target, result.AppUserModelId, result.IconSource);
+            _services.Import.AddInstalledApp(entry);
+        }
+        catch (Exception ex) when (ex is StorageException or IOException or UnauthorizedAccessException)
+        {
+            Trace.WriteLine($"Launcher result was not added to the library: {ex.Message}");
+        }
     }
 
     /// <summary>把一条系统结果加入应用库并放进启动台。</summary>

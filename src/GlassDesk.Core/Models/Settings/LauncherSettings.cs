@@ -46,4 +46,5 @@ public sealed class LauncherSettings
     /// 有些用户只想要一个启动器。
     /// </remarks>
     public bool SearchFiles { get; set; } = true;
+
 }
