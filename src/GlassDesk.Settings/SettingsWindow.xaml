@@ -262,6 +262,12 @@
               <CheckBox x:Name="LauncherRememberPageCheck" Margin="0,8,0,0" Content="记住当前浏览页"
                         AutomationProperties.Name="记住启动台页码"
                         Checked="OnLauncherControlChanged" Unchecked="OnLauncherControlChanged" />
+              <CheckBox x:Name="LauncherSearchAppsCheck" Margin="0,8,0,0" Content="搜索本机已安装的应用"
+                        AutomationProperties.Name="搜索本机已安装的应用"
+                        Checked="OnLauncherControlChanged" Unchecked="OnLauncherControlChanged" />
+              <CheckBox x:Name="LauncherSearchFilesCheck" Margin="0,8,0,0" Content="搜索本地文件（使用 Windows 搜索索引）"
+                        AutomationProperties.Name="搜索本地文件"
+                        Checked="OnLauncherControlChanged" Unchecked="OnLauncherControlChanged" />
               <TextBlock x:Name="LauncherSettingsStatus" Margin="0,10,0,16" TextWrapping="Wrap"
                          Foreground="{Binding SecondaryForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
               <Separator Margin="0,4,0,14" />

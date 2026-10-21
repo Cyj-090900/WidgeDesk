@@ -28,4 +28,22 @@ public sealed class LauncherSettings
     /// 再次打开时恢复上次停留的页面，关闭则总是从第一页开始。
     /// </summary>
     public bool RememberLastPage { get; set; } = true;
+
+    /// <summary>
+    /// 搜索时一并查本机已安装的应用（含打包应用与经典程序）。
+    /// </summary>
+    /// <remarks>
+    /// 关闭后搜索只覆盖应用库里的条目，也就是这个功能上线之前的行为。
+    /// 默认开启：用户按下搜索框时的预期是「找机器上任何东西」。
+    /// </remarks>
+    public bool SearchInstalledApps { get; set; } = true;
+
+    /// <summary>
+    /// 搜索时一并查 Windows 搜索索引里的本地文件。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="SearchInstalledApps"/> 分别开关：查文件比查应用慢，
+    /// 有些用户只想要一个启动器。
+    /// </remarks>
+    public bool SearchFiles { get; set; } = true;
 }

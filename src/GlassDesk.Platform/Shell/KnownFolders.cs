@@ -18,6 +18,18 @@ public static class KnownFolders
     /// <summary>当前用户的「开始」菜单程序目录。</summary>
     public static string? Programs => Resolve(Shell32.FolderIdPrograms);
 
+    /// <summary>用户配置文件根目录。索引文件搜索的上限范围就是它。</summary>
+    public static string? UserProfile => Resolve(Shell32.FolderIdProfile);
+
+    /// <summary>桌面目录。与「桌面图标显隐」看到的是同一个位置（可能被重定向）。</summary>
+    public static string? Desktop => Resolve(Shell32.FolderIdDesktop);
+
+    /// <summary>文档目录。</summary>
+    public static string? Documents => Resolve(Shell32.FolderIdDocuments);
+
+    /// <summary>下载目录。</summary>
+    public static string? Downloads => Resolve(Shell32.FolderIdDownloads);
+
     /// <summary>取不到时返回 null，由调用方决定这是不是问题。</summary>
     private static string? Resolve(Guid folderId)
     {

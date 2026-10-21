@@ -131,6 +131,59 @@ public sealed class ImportService : IImportService
         };
     }
 
+    /// <summary>
+    /// 把一条已安装应用加入应用库，并放进启动台。
+    /// </summary>
+    /// <remarks>
+    /// 供搜索结果的「添加到启动台」使用。它与 <see cref="ImportItems"/> 分开，是因为
+    /// 已安装应用的目标是 <c>shell:AppsFolder\&lt;AUMID&gt;</c> —— 不是文件路径，
+    /// 走不到「来源必须存在」那条校验里（见 <see cref="AppEntryFactory.CreateFromInstalledApp"/>）。
+    ///
+    /// <para>
+    /// 其余行为与批量导入一致：先按去重键查已有条目，再落盘，最后把新条目放进布局。
+    /// 重复添加返回 <see cref="AddEntryResult.Duplicate"/> 而不是报错。
+    /// </para>
+    /// </remarks>
+    public AddEntryResult AddInstalledApp(AppEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        var existing = _library.FindByKey(AppEntryKey.Compute(entry));
+        if (existing is not null)
+        {
+            return AddEntryResult.Duplicate;
+        }
+
+        CacheIcon(entry);
+
+        var result = _library.Add(entry);
+        if (result != AddEntryResult.Added)
+        {
+            return result;
+        }
+
+        try { _library.Save(); }
+        catch (StorageException)
+        {
+            _library.Remove(entry.Id);
+            throw;
+        }
+
+        if (_layouts is not null)
+        {
+            var capacity = Math.Max(1, _launcherCapacity());
+            var draft = LauncherLayoutRules.Reconcile(_layouts.Launcher,
+                _library.Items.Where(item => item.IsUsable).Select(item => item.Id), capacity);
+            draft = LauncherLayoutEditor.AddShortcuts(draft, [entry.Id], capacity);
+            if (!LauncherLayoutRules.Equivalent(_layouts.Launcher, draft)
+                && !_layouts.CommitLauncher(draft, _layouts.LauncherVersion))
+                throw new StorageException("启动台布局已变化，请重试添加。", _layouts.LauncherFilePath);
+        }
+
+        _observer?.OnLibraryChanged();
+        return AddEntryResult.Added;
+    }
+
     /// <summary>导入单个来源，结果写进传进来的三个列表。</summary>
     public void ImportOne(
         ImportRequest request,

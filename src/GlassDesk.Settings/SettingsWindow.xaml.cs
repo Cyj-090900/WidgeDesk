@@ -241,6 +241,8 @@ public partial class SettingsWindow : GlassWindow
             LauncherColumnsSlider.Value = Math.Clamp(settings.Columns, 2, 12);
             LauncherFocusSearchCheck.IsChecked = settings.FocusSearchOnOpen;
             LauncherRememberPageCheck.IsChecked = settings.RememberLastPage;
+            LauncherSearchAppsCheck.IsChecked = settings.SearchInstalledApps;
+            LauncherSearchFilesCheck.IsChecked = settings.SearchFiles;
             LauncherSettingsStatus.Text = _launcherValuesOutOfRange
                 ? "配置文件中的网格数值超出支持范围，已显示为最近的可用值；请先恢复当前页默认，避免覆盖原数据。"
                 : "修改后立即保存并应用到启动台。";
@@ -262,6 +264,8 @@ public partial class SettingsWindow : GlassWindow
             FullscreenMode = false,
             FocusSearchOnOpen = LauncherFocusSearchCheck.IsChecked == true,
             RememberLastPage = LauncherRememberPageCheck.IsChecked == true,
+            SearchInstalledApps = LauncherSearchAppsCheck.IsChecked == true,
+            SearchFiles = LauncherSearchFilesCheck.IsChecked == true,
         };
         var candidate = SettingsPageEditor.Clone(current);
         candidate.Launcher = next;
@@ -273,7 +277,8 @@ public partial class SettingsWindow : GlassWindow
             return;
         }
         if (old.Rows == next.Rows && old.Columns == next.Columns && old.FullscreenMode == next.FullscreenMode
-            && old.FocusSearchOnOpen == next.FocusSearchOnOpen && old.RememberLastPage == next.RememberLastPage) return;
+            && old.FocusSearchOnOpen == next.FocusSearchOnOpen && old.RememberLastPage == next.RememberLastPage
+            && old.SearchInstalledApps == next.SearchInstalledApps && old.SearchFiles == next.SearchFiles) return;
         try
         {
             current.Launcher = next;

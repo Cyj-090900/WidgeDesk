@@ -77,6 +77,18 @@ internal static partial class Shell32
     /// <summary>所有用户的「开始」菜单程序目录（<c>%ProgramData%\...\Start Menu\Programs</c>）。</summary>
     internal static readonly Guid FolderIdCommonPrograms = new("0139d44e-6afe-49f2-8690-3dafcae6ffb8");
 
+    /// <summary>用户配置文件根目录（<c>FOLDERID_Profile</c>）。</summary>
+    internal static readonly Guid FolderIdProfile = new("5e6c858f-0e22-4760-9afe-ea3317b67173");
+
+    /// <summary>桌面目录（<c>FOLDERID_Desktop</c>）。</summary>
+    internal static readonly Guid FolderIdDesktop = new("b4bfcc3a-db2c-424c-b029-7fe99a87c641");
+
+    /// <summary>文档目录（<c>FOLDERID_Documents</c>）。</summary>
+    internal static readonly Guid FolderIdDocuments = new("fdd39ad0-238f-46af-adb4-6c85480369c7");
+
+    /// <summary>下载目录（<c>FOLDERID_Downloads</c>）。</summary>
+    internal static readonly Guid FolderIdDownloads = new("374de290-123f-4565-9164-39c4925e467b");
+
     // ---- 图标 ----
 
     /// <summary>取图标句柄。返回的句柄必须用 <c>DestroyIcon</c> 释放。</summary>

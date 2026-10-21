@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using GlassDesk.AppServices;
 using GlassDesk.Core.Models;
 using GlassDesk.UI.Controls;
 
@@ -36,12 +37,42 @@ public partial class LauncherWindow
         if (_services is null || _workspace is null) return [];
         if (_view.IsSearching)
         {
-            var members = LauncherLayoutRules.AppIds(_workspace.Layout).ToHashSet(StringComparer.Ordinal);
-            return _services.Search.SearchApps(_view.Query, int.MaxValue)
-                .Where(hit => members.Contains(hit.Item.Id))
-                .Select(hit => new LauncherSlot { ItemId = hit.Item.Id }).ToList();
+            // 库内命中排前，系统结果排后：搜索的首要用意通常是启动一个程序，
+            // 而库里已有的条目是用户自己整理过的，优先级高于临时找到的东西。
+            //
+            // 这里刻意**不再**按「是否已在启动台布局里」过滤——那个过滤只对浏览模式有意义，
+            // 用在搜索上会让未导入的应用和任何文件都搜不到。
+            var slots = _services.Search.SearchApps(_view.Query, int.MaxValue)
+                .Select(hit => new LauncherSlot { ItemId = hit.Item.Id })
+                .ToList();
+
+            foreach (var systemResult in _systemResults)
+            {
+                // 已经在库里的目标不重复列出：那条记录会由上面的库内搜索给出。
+                if (_services.Library.Items.Any(item => item is { IsUsable: true }
+                    && string.Equals(item.Target, systemResult.Target, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                slots.Add(new LauncherSlot { ItemId = SystemTileIdFor(systemResult) });
+            }
+
+            return slots;
         }
         return (_dragEdit?.Draft ?? _workspace.Layout).Pages.SelectMany(page => page.Slots).ToList();
+    }
+
+    /// <summary>取一条系统结果对应的槽位 id。</summary>
+    private string SystemTileIdFor(SystemSearchResult result)
+    {
+        foreach (var pair in _systemTiles)
+        {
+            if (ReferenceEquals(pair.Value, result)) return pair.Key;
+        }
+
+        // 索引表与结果列表总是同步重建的，走到这里说明调用方拿的不是当前这批结果。
+        throw new InvalidOperationException("System search result is not part of the current result set.");
     }
 
     private void RenderTiles(bool reuseUnchanged = false, bool reusePageTiles = false)
@@ -95,8 +126,12 @@ public partial class LauncherWindow
     {
         var isGroup = slot.Kind == LauncherSlotKind.Group;
         var id = isGroup ? slot.Group?.Id : slot.ItemId;
-        var entry = isGroup ? null : _services?.Library.Find(id);
-        var title = isGroup ? slot.Group?.Name ?? "新建分组" : entry?.DisplayName ?? "未知应用";
+        var systemResult = !isGroup && TryGetSystemResult(id, out var foundSystemResult) ? foundSystemResult : null;
+        var isSystemResult = systemResult is not null;
+        var entry = isGroup || isSystemResult ? null : _services?.Library.Find(id);
+        var title = isGroup ? slot.Group?.Name ?? "新建分组"
+            : systemResult is not null ? systemResult.DisplayName
+            : entry?.DisplayName ?? "未知应用";
         var missing = entry?.IsTargetMissing == true;
         var text = new TextBlock
         {
@@ -122,6 +157,7 @@ public partial class LauncherWindow
         iconVisual.HorizontalAlignment = HorizontalAlignment.Center;
         var iconHost = new Border { Child = iconVisual };
         if (!isGroup && entry is not null) RequestIcon(entry, iconHost, AppIconSize);
+        else if (systemResult is not null) RequestSystemIcon(systemResult, iconHost, AppIconSize);
         stack.Children.Add(iconHost);
         stack.Children.Add(text);
         var button = new LauncherAppTileButton(iconHost)
@@ -240,6 +276,11 @@ public partial class LauncherWindow
             _view.OpenGroupId = id;
             RenderGroup();
         }
+        else if (TryGetSystemResult(id, out var systemResult) && systemResult is not null)
+        {
+            // 系统搜索结果：点击即用，不入库。
+            LaunchSystemResult(systemResult);
+        }
         else if (id is not null)
             ActivateEntry(id);
     }
@@ -248,6 +289,7 @@ public partial class LauncherWindow
     {
         _view.Query = SearchBox.Text;
         _view.OpenGroupId = null;
+        ScheduleSystemSearch();
         RenderTiles();
     }
 

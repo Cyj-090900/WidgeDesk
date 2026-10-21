@@ -228,8 +228,17 @@ public static class WindowIdentity
     /// ShellLink 上复用它读显式身份，避免为了一个属性把文件再加载一遍。
     /// </remarks>
     internal static string? ReadAumid(IPropertyStore store)
+        => ReadStringProperty(store, in PropertyKeys.AppUserModelId);
+
+    /// <summary>从属性存储里按给定键读出一个字符串属性；没有值或类型不符时返回 null。</summary>
+    /// <remarks>
+    /// 与 <see cref="ReadAumid"/> 同一条实现：都要求调用方按 <c>VT_LPWSTR</c> 取，
+    /// 并在读完之后用 <c>CoTaskMemFree</c> 释放属性分配器给出的缓冲区。
+    /// 供「应用」文件夹的名称读取复用。
+    /// </remarks>
+    internal static string? ReadStringProperty(IPropertyStore store, in PropertyKey key)
     {
-        var hr = store.GetValue(in PropertyKeys.AppUserModelId, out var value);
+        var hr = store.GetValue(in key, out var value);
 
         if (hr != Ole32.SoK || value.Type == VarType.Empty || value.Pointer == 0)
         {

@@ -36,6 +36,24 @@ internal static class ShellComIds
 
     /// <summary><c>IPropertyStore</c> 的接口标识。</summary>
     internal static readonly Guid PropertyStore = new("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99");
+
+    /// <summary>
+    /// <c>BHID_EnumItems</c>：把一个外壳文件夹项当作子项集合绑定出来。
+    /// </summary>
+    /// <remarks>
+    /// 枚举「应用」文件夹（<c>shell:AppsFolder</c>）时用它拿 <c>IEnumShellItems</c>。
+    /// <c>BindToHandler</c> 的第一个参数通常是 <c>IBindCtx</c>，只读枚举传 0 即可。
+    /// </remarks>
+    internal static readonly Guid EnumItems = new("94F60519-2850-4924-AA5A-D15E84868039");
+
+    /// <summary><c>IShellItem</c> 的接口标识符。</summary>
+    internal static readonly Guid ShellItem = new("43826D1E-E718-42EE-BC55-A1E261C37BFE");
+
+    /// <summary><c>IShellItem2</c> 的接口标识符。它多出按属性键读取的能力。</summary>
+    internal static readonly Guid ShellItem2 = new("7E9FB0D3-919F-4307-AB2E-9B1860310C93");
+
+    /// <summary><c>IEnumShellItems</c> 的接口标识符，用于遍历文件夹里的子项。</summary>
+    internal static readonly Guid EnumShellItems = new("70629033-E363-4A28-A567-0DB78006E6D7");
 }
 
 /// <summary>属性系统的键：格式 id 加属性编号。</summary>
@@ -62,6 +80,16 @@ internal static class PropertyKeys
 {
     internal static readonly PropertyKey AppUserModelId = new(
         new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), 5);
+
+    /// <summary>
+    /// <c>System.ItemNameDisplay</c>：用户可见的名称。
+    /// </summary>
+    /// <remarks>
+    /// 「开始」菜单上的名字（「计算器」「百度网盘」）就是它。应用文件夹里的子项
+    /// 必须按键名显式取回这个属性——默认的属性存储里读不到它。
+    /// </remarks>
+    internal static readonly PropertyKey ItemNameDisplay = new(
+        new Guid("B725F130-47EF-101A-A5F1-02608C9EEBAC"), 10);
 }
 
 /// <summary><c>VARENUM</c> 里本产品用到的类型标记。</summary>
@@ -247,4 +275,88 @@ internal static class Siigbf
 
     /// <summary>源图小于请求尺寸时允许放大。</summary>
     internal const int ScaleUp = 0x00000100;
+}
+
+/// <summary>
+/// <c>IShellItem</c>：一个外壳项。
+/// </summary>
+/// <remarks>
+/// 只用来枚举「应用」文件夹与读取项的名字。方法顺序即 vtable 槽位顺序，
+/// 因此不能只声明用得上的那几个——少写一个，后面的方法就会落到错误的槽位上，
+/// 而且不会报错（与 <see cref="IPropertyStore"/> 的说明同理）。
+/// </remarks>
+[GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
+[Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE")]
+internal partial interface IShellItem
+{
+    [PreserveSig]
+    int BindToHandler(nint bindContext, in Guid handler, in Guid interfaceId, out nint result);
+
+    [PreserveSig]
+    int GetParent(out nint parent);
+
+    [PreserveSig]
+    int GetDisplayName(uint nameType, out nint name);
+
+    [PreserveSig]
+    int GetAttributes(uint mask, out uint attributes);
+
+    [PreserveSig]
+    int Compare(IShellItem other, uint hint, out int order);
+}
+
+/// <summary>
+/// <c>IShellItem2</c>：在 <c>IShellItem</c> 之上按属性键读值。
+/// </summary>
+/// <remarks>
+/// <b>关键在于 <c>GetPropertyStoreForKeys</c>。</b>应用文件夹的子项在默认属性存储里
+/// 读不到 <c>System.ItemNameDisplay</c>，必须按键名显式打开存储再读，
+/// 否则拿到的名称会是 AUMID。
+/// </remarks>
+[GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
+[Guid("7E9FB0D3-919F-4307-AB2E-9B1860310C93")]
+internal partial interface IShellItem2
+{
+    [PreserveSig] int BindToHandler(nint bindContext, in Guid handler, in Guid interfaceId, out nint result);
+    [PreserveSig] int GetParent(out nint parent);
+    [PreserveSig] int GetDisplayName(uint nameType, out nint name);
+    [PreserveSig] int GetAttributes(uint mask, out uint attributes);
+    [PreserveSig] int Compare(IShellItem other, uint hint, out int order);
+    [PreserveSig] int GetPropertyStore(int flags, in Guid interfaceId, out nint store);
+    [PreserveSig] int GetPropertyStoreWithCreateObject(int flags, nint createObject, in Guid interfaceId, out nint store);
+    [PreserveSig] int GetPropertyStoreForKeys(in PropertyKey keys, uint count, int flags, in Guid interfaceId, out nint store);
+    [PreserveSig] int GetPropertyDescriptionList(in PropertyKey keyType, in Guid interfaceId, out nint list);
+    [PreserveSig] int Update(nint store);
+    [PreserveSig] int GetProperty(in PropertyKey key, out PropVariant value);
+    [PreserveSig] int GetPropertyWithDefault(in PropertyKey key, in PropVariant defaultValue, out PropVariant value);
+    [PreserveSig] int GetPropertyString(in PropertyKey key, out nint value);
+    [PreserveSig] int GetUInt32(in PropertyKey key, out uint value);
+    [PreserveSig] int GetUInt64(in PropertyKey key, out ulong value);
+    [PreserveSig] int GetInt32(in PropertyKey key, out int value);
+    [PreserveSig] int GetBool(in PropertyKey key, out int value);
+    [PreserveSig] int GetString(in PropertyKey key, out nint value);
+}
+
+/// <summary>
+/// <c>IEnumShellItems</c>：遍历一个外壳文件夹里的子项。
+/// </summary>
+/// <remarks>
+/// <c>Next</c> 的 <c>items</c> 出参在 <c>count</c> 为 1 时是单个 <c>IShellItem*</c>，
+/// 归调用方所有，需要 <c>Marshal.Release</c>。
+/// </remarks>
+[GeneratedComInterface]
+[Guid("70629033-E363-4A28-A567-0DB78006E6D7")]
+internal partial interface IEnumShellItems
+{
+    [PreserveSig]
+    int Next(uint count, out nint items, out uint fetched);
+
+    [PreserveSig]
+    int Skip(uint count);
+
+    [PreserveSig]
+    int Reset();
+
+    [PreserveSig]
+    int Clone(out nint clone);
 }

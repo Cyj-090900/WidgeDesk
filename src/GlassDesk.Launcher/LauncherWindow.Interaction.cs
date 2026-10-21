@@ -98,6 +98,14 @@ public partial class LauncherWindow
         }
         else
         {
+            if (TryGetSystemResult(id, out var systemResult) && systemResult is not null)
+            {
+                // 系统搜索结果不在应用库里，因此没有「编辑 / 重新定位 / 分组」这些动作；
+                // 能做的就是打开，或者把它收进启动台。
+                AddMenu(menu, "打开", () => LaunchSystemResult(systemResult));
+                AddMenu(menu, "添加到启动台", () => AddSystemResultToLauncher(systemResult));
+                return menu;
+            }
             AddMenu(menu, "打开", () => ActivateEntry(id));
             AddMenu(menu, "编辑名称、图标和别名", () => EditEntry(id));
             if (_services?.Library.Find(id)?.IsTargetMissing == true)

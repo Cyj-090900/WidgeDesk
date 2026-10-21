@@ -28,6 +28,39 @@ public static class AppEntryFactory
         string? displayNameOverride = null)
         => CreateFromPath(new ImportRequest { Source = path, DisplayName = displayNameOverride });
 
+    /// <summary>
+    /// 从一个已安装应用造记录，供搜索结果的「添加到启动台」使用。
+    /// </summary>
+    /// <remarks>
+    /// <b>为什么不能走 <see cref="TryCreateFromPath"/>。</b>那条路要求来源真实存在，
+    /// 而打包应用的目标是 <c>shell:AppsFolder\&lt;AUMID&gt;</c> —— 它不是文件路径，
+    /// <c>File.Exists</c> 必然为假，导入会被判成「找不到」。
+    ///
+    /// <para>
+    /// 造出来的形状与「开始」菜单里 UWP 快捷方式那条完全一致：类型是
+    /// <see cref="AppItemKind.Shortcut"/>、目标保留 <c>shell:</c> 形式、
+    /// 身份写进 <see cref="AppEntry.AppUserModelId"/>。这样
+    /// <c>WindowMatcher</c> 能按其身份匹配到已运行窗口，而不是每次点击都新起一个。
+    /// </para>
+    /// </remarks>
+    public static AppEntry CreateFromInstalledApp(string displayName, string launchTarget, string? aumid,
+        string? iconSource = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(launchTarget);
+
+        var name = (displayName ?? string.Empty).Trim();
+
+        return new AppEntry
+        {
+            Id = AppLibraryStore.NewId(),
+            Kind = AppItemKind.Shortcut,
+            Target = launchTarget.Trim(),
+            DisplayName = name.Length == 0 ? launchTarget : name,
+            AppUserModelId = string.IsNullOrWhiteSpace(aumid) ? null : aumid.Trim(),
+            IconSource = string.IsNullOrWhiteSpace(iconSource) ? launchTarget.Trim() : iconSource,
+        };
+    }
+
     private static (AppEntry?, ImportFailureReason, string) CreateFromUrl(ImportRequest request)
     {
         var url = request.Source?.Trim() ?? string.Empty;

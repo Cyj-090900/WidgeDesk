@@ -42,6 +42,7 @@ public sealed class AppServiceHost : IDisposable, IImportObserver
         Maintenance = new LibraryMaintenance(data.Library, Icons, this);
         Running = new RunningAppTracker(data.Library);
         Search = new SearchService(() => data.Library.Items, () => data.Layouts.Launcher);
+        SystemSearch = new SystemSearchService();
         Editor = new AppEntryEditor(data.Library, data.Paths, OnLibraryChanged);
     }
 
@@ -54,6 +55,9 @@ public sealed class AppServiceHost : IDisposable, IImportObserver
     public LibraryMaintenance Maintenance { get; }
 
     public SearchService Search { get; }
+
+    /// <summary>系统范围搜索（已安装应用 + 索引文件）。与库内搜索并列，互不影响。</summary>
+    public SystemSearchService SystemSearch { get; }
 
     public AppEntryEditor Editor { get; }
 
