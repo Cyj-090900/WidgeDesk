@@ -27,6 +27,17 @@ public sealed partial class UpdateClient
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
         using var request = Request(_source, metadata: true);
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+
+        // GitHub 对匿名请求按来源 IP 限流（每小时 60 次）。撞上时给 403 和一段英文原文，
+        // 原样抛给界面等于把「Response status code does not indicate success: 403」丢给用户——
+        // 既看不懂，也不知道该等多久。这里换成可以直接照做的说明。
+        if ((int)response.StatusCode == 403
+            && response.Headers.TryGetValues("X-RateLimit-Remaining", out var remaining)
+            && remaining.FirstOrDefault() == "0")
+        {
+            throw new UpdateRateLimitedException(RetryAfter(response));
+        }
+
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength > MaximumMetadataSize)
             throw new InvalidDataException("更新信息过大。");
@@ -157,6 +168,18 @@ public sealed partial class UpdateClient
         return request;
     }
 
+    /// <summary>配额什么时候恢复；读不到就返回 null（由调用方给一个保守的说法）。</summary>
+    private static DateTimeOffset? RetryAfter(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("X-RateLimit-Reset", out var reset)
+            && long.TryParse(reset.FirstOrDefault(), out var seconds))
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime();
+        }
+
+        return null;
+    }
+
     private static string Repository(Uri source)
     {
         if (!source.IsAbsoluteUri || source.Scheme != "https" || source.Host != "api.github.com"
@@ -220,4 +243,29 @@ public sealed partial class UpdateClient
     private static partial Regex DigestPattern();
     [GeneratedRegex(@"^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/latest$")]
     private static partial Regex SourcePattern();
+}
+
+/// <summary>
+/// GitHub 的匿名请求配额用完了。
+/// </summary>
+/// <remarks>
+/// 单独成一个类型，是为了让界面能把它与「网络断了」区分开：这两件事对用户的
+/// 含义完全不同——一个该等一会儿，一个该检查网络。消息本身就是给用户看的，
+/// 不再拼英文原文。
+/// </remarks>
+public sealed class UpdateRateLimitedException(DateTimeOffset? resumeAt) : Exception(Describe(resumeAt))
+{
+    /// <summary>配额恢复的时间；读不到响应头时为 null。</summary>
+    public DateTimeOffset? ResumeAt { get; } = resumeAt;
+
+    private static string Describe(DateTimeOffset? resumeAt)
+    {
+        var advice = resumeAt is { } moment
+            ? $"请在 {moment:HH:mm} 之后重试。"
+            : "请过一段时间再试。";
+
+        return "GitHub 限制了本机此刻的匿名查询次数（每小时 60 次），暂时无法检查更新。"
+            + advice
+            + "\n这不是网络故障，稍后会自动恢复。";
+    }
 }

@@ -144,6 +144,57 @@ public sealed class UpdateClientTests
         await Assert.ThrowsAsync<HttpRequestException>(() => new UpdateClient(http, Source).CheckAsync(new Version(0, 2, 9), CancellationToken.None));
     }
 
+    /// <summary>
+    /// 匿名配额用尽时给出可照做的中文说明，而不是 GitHub 的英文原文。
+    /// </summary>
+    /// <remarks>
+    /// 界面上曾经直接显示「Response status code does not indicate success: 403
+    /// (rate limit exceeded)」——用户既看不懂，也不知道要等多久。配额是按来源 IP
+    /// 算的，共用出口的地方（公司、校园网）更容易撞上。
+    /// </remarks>
+    [Fact]
+    public async Task Rate_limited_response_explains_what_to_do()
+    {
+        var reset = DateTimeOffset.UtcNow.AddMinutes(30).ToUnixTimeSeconds();
+        using var http = new HttpClient(new RateLimitHandler(reset));
+
+        var error = await Assert.ThrowsAsync<UpdateRateLimitedException>(
+            () => new UpdateClient(http, Source).CheckAsync(new Version(0, 2, 9), CancellationToken.None));
+
+        Assert.NotNull(error.ResumeAt);
+        Assert.Contains("60", error.Message, StringComparison.Ordinal);
+        Assert.Contains("之后重试", error.Message, StringComparison.Ordinal);
+        // 原始英文不能出现——那正是这条修复针对的东西。
+        Assert.DoesNotContain("Response status code", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>普通的 403（例如根本没有权限）不该被误报成「请求太频繁」。</summary>
+    [Fact]
+    public async Task Forbidden_without_rate_limit_headers_stays_a_generic_failure()
+    {
+        using var http = new HttpClient(new FixtureHandler([], HttpStatusCode.Forbidden));
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => new UpdateClient(http, Source).CheckAsync(new Version(0, 2, 9), CancellationToken.None));
+    }
+
+    /// <summary>完整的 403 + 配额用尽响应。</summary>
+    private sealed class RateLimitHandler(long resetEpoch) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
+            {
+                Content = new StringContent(
+                    """{"message":"API rate limit exceeded for 203.0.113.7."}""",
+                    System.Text.Encoding.UTF8, "application/json"),
+            };
+            response.Headers.TryAddWithoutValidation("X-RateLimit-Remaining", "0");
+            response.Headers.TryAddWithoutValidation("X-RateLimit-Reset", resetEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return Task.FromResult(response);
+        }
+    }
+
     private static UpdateRelease Release(byte[] bytes) => UpdateClient.ParseRelease(
         Fixture(digest: "sha256:" + Convert.ToHexString(SHA256.HashData(bytes)), size: bytes.Length), new Version(0, 2, 9), Source)!;
     private static string TempRoot() => Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "WidgeDesk-update-tests-" + Guid.NewGuid().ToString("N"))).FullName;

@@ -17,6 +17,15 @@ internal sealed partial class AppHost
     private UpdateWindow? _updateWindow;
     private bool _checkingUpdate;
 
+    /// <summary>上次被 GitHub 限流到什么时候；在此之前不再自动检查。</summary>
+    /// <remarks>
+    /// 配额按<strong>来源 IP</strong>算，同一出口下的所有设备共用 60 次/小时。
+    /// 撞上之后再每次启动都重试，只会把一个短时限流拖成一直失败；
+    /// 记住恢复时间、到点再试，是唯一不会自我加重问题的做法。
+    /// 手动检查不受此限——用户主动点了，就该给他一个真实答案。
+    /// </remarks>
+    private DateTimeOffset? _updateResumeAt;
+
     internal static Version ProductVersion => Version.TryParse(
         typeof(AppHost).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0].Split('-')[0], out var version)
         ? new Version(version.Major, version.Minor, Math.Max(0, version.Build)) : new Version(0, 2, 9);
@@ -50,6 +59,15 @@ internal sealed partial class AppHost
     {
         if (_shuttingDown || _checkingUpdate) return;
         if (_updateWindow is not null) { if (manual) _updateWindow.Activate(); return; }
+
+        // 还在限流期内就别自动去撞了：省一次请求，也免得界面上每开一次都报一次失败。
+        if (!manual && _updateResumeAt is { } resumeAt && DateTimeOffset.Now < resumeAt)
+        {
+            _settings?.ShowUpdateStatus(ProductVersion.ToString(),
+                $"GitHub 限制了本机此刻的匿名查询次数，{resumeAt:HH:mm} 之后会自动恢复检查。");
+            return;
+        }
+
         _checkingUpdate = true;
         _settings?.ShowUpdateStatus(ProductVersion.ToString(), "正在检查更新…", checking: true);
         try
@@ -73,6 +91,13 @@ internal sealed partial class AppHost
         catch (OperationCanceledException)
         {
             if (!_shuttingDown) _settings?.ShowUpdateStatus(ProductVersion.ToString(), "检查更新已取消或超时，请稍后重试。");
+        }
+        catch (UpdateRateLimitedException limited)
+        {
+            // 配额用完与「网络断了」是两件事：前者只能等，后者该查网络。
+            // 消息本身已经写成用户能照做的样子，不再拼英文原文。
+            _updateResumeAt = limited.ResumeAt;
+            if (!_shuttingDown) _settings?.ShowUpdateStatus(ProductVersion.ToString(), limited.Message);
         }
         catch (Exception ex)
         {
