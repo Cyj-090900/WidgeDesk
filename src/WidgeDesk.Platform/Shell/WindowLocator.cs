@@ -283,13 +283,32 @@ public static class WindowLocator
     /// 一个窗口值得当作「这个程序的窗口」候选吗。
     /// </summary>
     /// <remarks>
-    /// 三条都要满足：可见、有标题、不是工具窗口。最后一条尤其重要——
-    /// 很多程序都留着一个隐藏的、无标题的消息窗口，把它们算进来会让
+    /// 四条都要满足：可见、<strong>没有被 DWM 遮蔽</strong>、有标题、不是工具窗口。
+    ///
+    /// <para>
+    /// 「可见」与「真的看得见」在 Windows 上是两件事。<c>IsWindowVisible</c> 只反映
+    /// <c>WS_VISIBLE</c> 位，而系统会保留一些<em>标记为可见、实际被 DWM 藏起来</em>的窗口：
+    /// 最典型的是输入法宿主 <c>TextInputHost.exe</c> 的
+    /// 「Microsoft Text Input Application」（实测 <c>DwmGetWindowAttribute</c> 的
+    /// <c>DWMWA_CLOAKED</c> 返回 2 = 被外壳遮蔽）。它<strong>不在任务栏上</strong>，
+    /// 用户也从没见过它，但如果只信 <c>WS_VISIBLE</c>，它会被当成一个正在运行的应用
+    /// 出现在程序坞里——那就是「Dock 上莫名多出一个 TextInputHost」。
+    /// </para>
+    ///
+    /// <para>
+    /// 最后一条尤其重要——很多程序都留着一个隐藏的、无标题的消息窗口，把它们算进来会让
     /// 「只有一个窗口」变成「有多个窗口」，于是程序坞弹出选择列表。
+    /// </para>
     /// </remarks>
     private static bool IsCandidateWindow(nint window)
     {
         if (!User32.IsWindowVisible(window))
+        {
+            return false;
+        }
+
+        // 被 DWM 遮蔽的窗口不可见，也不在任务栏上。与任务栏一致，不算候选。
+        if (DwmApi.IsCloaked(window))
         {
             return false;
         }

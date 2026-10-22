@@ -5,7 +5,20 @@ using System.Text.RegularExpressions;
 
 namespace WidgeDesk.AppServices.Updates;
 
-/// <summary>Stable GitHub releases and bounded, checksum-verified installer downloads.</summary>
+/// <summary>Stable release metadata and bounded, checksum-verified installer downloads.</summary>
+/// <remarks>
+/// 支持两种元数据来源：
+/// <list type="number">
+/// <item><b>GitHub Releases API</b>（旧格式）——按仓库查询最新发布。</item>
+/// <item><b>静态清单</b>（推荐）——发布流程写一份 <c>latest.json</c>，由普通文件托管。</item>
+/// </list>
+///
+/// <para>
+/// <b>为什么要有第二种。</b>GitHub 的 API 对匿名请求按来源 IP 限流（每小时 60 次），
+/// 共用出口的用户会莫名其妙地「检查更新」失败，而网络明明是好的。静态文件不走 API，
+/// 没有这个限制；代价是发布流程要多写一个文件。
+/// </para>
+/// </remarks>
 public sealed partial class UpdateClient
 {
     public const long MaximumInstallerSize = 512L * 1024 * 1024;
@@ -16,10 +29,13 @@ public sealed partial class UpdateClient
     public UpdateClient(HttpClient http, Uri source)
     {
         ArgumentNullException.ThrowIfNull(http);
-        Repository(source);
+        ValidateSource(source);
         _http = http;
         _source = source;
     }
+
+    /// <summary>元数据是不是一份静态清单（而不是 GitHub API 查询）。</summary>
+    private bool IsManifestSource => !IsGitHubApiSource(_source);
 
     public async Task<UpdateRelease?> CheckAsync(Version current, CancellationToken token)
     {
@@ -50,7 +66,86 @@ public sealed partial class UpdateClient
             if (output.Length + read > MaximumMetadataSize) throw new InvalidDataException("更新信息过大。");
             output.Write(buffer, 0, read);
         }
-        return ParseRelease(System.Text.Encoding.UTF8.GetString(output.ToArray()), current, _source);
+        var text = System.Text.Encoding.UTF8.GetString(output.ToArray());
+
+        return IsManifestSource
+            ? ParseManifest(text, current, _source)
+            : ParseRelease(text, current, _source);
+    }
+
+    /// <summary>
+    /// 解析静态清单。
+    /// </summary>
+    /// <remarks>
+    /// 格式（由发布流程生成，字段与 GitHub API 的形状刻意保持接近，便于对照）：
+    /// <code>
+    /// {
+    ///   "version": "5.1.0",
+    ///   "fileName": "WidgeDesk-5.1.0-win-x64-Setup.exe",
+    ///   "size": 60714327,
+    ///   "sha256": "8f14e45f...",
+    ///   "notes": "本次更新……",
+    ///   "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.1.0"
+    /// }
+    /// </code>
+    ///
+    /// <para>
+    /// <b>校验比 API 那条路更严，不是更松。</b>清单是明文文件，谁都可能改它；
+    /// 因此除了摘要格式，还要核对文件名与版本一致、地址确实属于本仓库、
+    /// 页面地址是同一版本。任何一项不符就拒绝——宁可报「更新信息无效」，
+    /// 也不能让一份被改过的清单把用户引到别处。
+    /// </para>
+    /// </remarks>
+    public static UpdateRelease? ParseManifest(string json, Version current, Uri source)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            var text = root.GetProperty("version").GetString() ?? string.Empty;
+            if (!StableVersionPattern().IsMatch(text) || !Version.TryParse(text, out var version))
+                throw new InvalidDataException("更新版本号无效。仅支持正式版本。");
+
+            var installed = new Version(current.Major, current.Minor, Math.Max(0, current.Build));
+            if (version <= installed) return null;
+
+            var fileName = root.GetProperty("fileName").GetString() ?? string.Empty;
+            // 文件名必须与版本对应：一份写着 5.1.0 的清单不能指向 5.0.1 的包。
+            if (fileName != $"WidgeDesk-{version}-win-x64-Setup.exe")
+                throw new InvalidDataException("更新清单里的安装包名与版本不一致。");
+
+            var size = root.GetProperty("size").GetInt64();
+            if (size <= 0 || size > MaximumInstallerSize)
+                throw new InvalidDataException("更新安装包大小无效。");
+
+            var sha = root.GetProperty("sha256").GetString() ?? string.Empty;
+            if (!Sha256HexPattern().IsMatch(sha))
+                throw new InvalidDataException("更新清单缺少有效的 SHA-256。");
+
+            var page = root.GetProperty("page").GetString() ?? string.Empty;
+
+            // 下载地址由清单**显式给出**，不靠「清单所在目录 + 文件名」去推：
+            // 清单通常放在仓库根或另一个分支，而安装包在 Releases 下，两者不同源。
+            var downloadText = root.GetProperty("downloadUrl").GetString() ?? string.Empty;
+            if (!Uri.TryCreate(downloadText, UriKind.Absolute, out var download))
+                throw new InvalidDataException("更新清单的安装包地址无效。");
+
+            if (!IsOurRepository(download.AbsoluteUri, $"releases/download/v{version}/{fileName}")
+                && !IsOurRepository(download.AbsoluteUri, $"releases/download/{version}/{fileName}"))
+                throw new InvalidDataException("更新地址不属于配置的发布仓库。");
+            if (!IsOurRepository(page, $"releases/tag/v{version}"))
+                throw new InvalidDataException("更新地址不属于配置的发布仓库。");
+
+            var notes = root.TryGetProperty("notes", out var body) ? body.GetString() ?? string.Empty : string.Empty;
+            return new UpdateRelease(version, fileName, download, sha.ToLowerInvariant(), size,
+                notes.Length > 12000 ? notes[..12000] : notes, new Uri(page));
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException
+            or FormatException or OverflowException or UriFormatException)
+        {
+            throw new InvalidDataException("更新信息格式无效。", ex);
+        }
     }
 
     public static UpdateRelease? ParseRelease(string json, Version current, Uri source)
@@ -180,6 +275,33 @@ public sealed partial class UpdateClient
         return null;
     }
 
+    /// <summary>这个来源是不是 GitHub 的 Releases API。</summary>
+    private static bool IsGitHubApiSource(Uri source)
+        => source.IsAbsoluteUri && source.Host == "api.github.com" && SourcePattern().IsMatch(source.AbsolutePath);
+
+    /// <summary>
+    /// 来源必须是一个可信的 https 地址：要么 GitHub 的 Releases API，要么本仓库的静态清单。
+    /// </summary>
+    /// <remarks>
+    /// 仍然拒绝明文 http 与外部主机：更新源决定下载什么、从哪里下载，
+    /// 一个可被替换的来源等于把安装包交给别人。
+    /// </remarks>
+    private static void ValidateSource(Uri source)
+    {
+        if (!source.IsAbsoluteUri || source.Scheme != "https"
+            || !source.IsDefaultPort || source.UserInfo.Length != 0 || source.Query.Length != 0 || source.Fragment.Length != 0)
+            throw new InvalidDataException("更新源必须是 https 地址，且不得带凭据、查询参数或片段。");
+
+        if (IsGitHubApiSource(source)) return;
+
+        // 静态清单：必须在 GitHub 的 raw/release-assets 域名下，且属于本仓库的某个名字。
+        var allowed = source.Host is "raw.githubusercontent.com" or "github.com"
+            || source.Host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
+
+        if (!allowed)
+            throw new InvalidDataException("更新源必须是本仓库托管的静态清单或 GitHub Releases 接口。");
+    }
+
     private static string Repository(Uri source)
     {
         if (!source.IsAbsoluteUri || source.Scheme != "https" || source.Host != "api.github.com"
@@ -241,6 +363,10 @@ public sealed partial class UpdateClient
     private static partial Regex StableVersionPattern();
     [GeneratedRegex(@"^sha256:[0-9a-fA-F]{64}$")]
     private static partial Regex DigestPattern();
+
+    /// <summary>静态清单里的摘要不带 <c>sha256:</c> 前缀（那是 GitHub API 的形状）。</summary>
+    [GeneratedRegex(@"^[0-9a-fA-F]{64}$")]
+    private static partial Regex Sha256HexPattern();
     [GeneratedRegex(@"^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/latest$")]
     private static partial Regex SourcePattern();
 }

@@ -186,3 +186,58 @@ jobs:
 
           gh release create $tag artifacts/* --title "WidgeDesk $version (win-x64)" --notes $notes
           Write-Host "released: $tag"
+
+      - name: Publish update manifest
+        # The in-app updater reads this static JSON instead of calling the GitHub API.
+        # The API is rate-limited per source IP (60/hour, shared by everyone behind a NAT),
+        # which made "check for updates" fail for users whose network was perfectly fine.
+        #
+        # The manifest carries the installer's SHA-256 and size, so the updater still verifies
+        # the download exactly as before — the only thing that changed is where the metadata
+        # comes from. Committing it to main means it is served over raw.githubusercontent.com,
+        # which has no such quota.
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "v$version"
+          $name = "WidgeDesk-$version-win-x64-Setup.exe"
+          $setup = "artifacts/$name"
+          if (-not (Test-Path $setup)) { throw "Installer '$name' not found." }
+
+          $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item -LiteralPath $setup).Length
+          $base = "https://github.com/${{ github.repository }}/releases/download/$tag/$name"
+
+          # Release notes are read from docs/releases/<version>.md when it exists; the manifest
+          # carries them so the update prompt can show them without another API call.
+          $notesPath = "docs/releases/$version.md"
+          $notes = if (Test-Path $notesPath) { Get-Content -LiteralPath $notesPath -Raw } else { "" }
+
+          $manifest = [ordered]@{
+            version     = $version
+            fileName    = $name
+            size        = $size
+            sha256      = $hash
+            downloadUrl = $base
+            page        = "https://github.com/${{ github.repository }}/releases/tag/$tag"
+            notes       = $notes
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath latest.json -Encoding utf8
+          Write-Host "manifest: version=$version size=$size sha256=$hash"
+
+      - name: Commit update manifest
+        # Ignore failures: a protected branch or a concurrent push must not fail the release.
+        # The release assets are already published at this point; the manifest only removes the
+        # rate limit, and the updater still falls back to the API when the file is missing.
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { Write-Host "manifest unchanged"; exit 0 }
+          git commit -m "更新清单：${{ steps.version.outputs.version }}"
+          git push

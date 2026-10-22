@@ -79,6 +79,45 @@ public sealed class RunningAppCatalogLiveTests
             $"共 {windows.Count} 个窗口，一个都识别不出归属——自动磁贴会永远为空");
     }
 
+    /// <summary>
+    /// 被 DWM 遮蔽的窗口不算候选——它们不可见，也不在任务栏上。
+    /// </summary>
+    /// <remarks>
+    /// <b>这一条对应一个真实上报的问题：</b>Dock 上莫名多出一个「TextInputHost」。
+    /// 那其实是 <c>TextInputHost.exe</c> 的输入法宿主窗口
+    /// （「Microsoft Text Input Application」）：<c>IsWindowVisible</c> 为真，
+    /// 但 <c>DWMWA_CLOAKED</c> 为 2（被外壳遮蔽），用户从来没见过它。
+    /// 只看 <c>WS_VISIBLE</c> 就会把它当成一个正在运行的应用。
+    /// </remarks>
+    [Fact]
+    public void 输入法宿主这类被遮蔽的窗口不会出现在自动磁贴里()
+    {
+        var windows = WindowLocator.EnumerateTopLevelWindows();
+
+        // 直接断言「被遮蔽的窗口一个都不在枚举结果里」——不依赖这台机器上
+        // 此刻是否真的跑着 TextInputHost。
+        var cloaked = windows.Where(window => IsCloaked(window.Handle)).ToList();
+
+        Assert.Empty(cloaked);
+
+        // 进一步确认那个具体的宿主：如果它此刻存在，也必须被排除。
+        var apps = RunningAppCatalog.Build(windows, EmptyLibrary(), [], [], (uint)Environment.ProcessId);
+        Assert.DoesNotContain(apps, app =>
+            app.DisplayName.Contains("Text Input", StringComparison.OrdinalIgnoreCase)
+            || app.IconSource.Contains("TextInputHost", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>用与生产代码相同的方式判断遮蔽。</summary>
+    private static bool IsCloaked(nint handle)
+    {
+        var cloaked = 0;
+        var hr = DwmGetWindowAttribute(handle, 14 /* DWMWA_CLOAKED */, ref cloaked, sizeof(int));
+        return hr == 0 && cloaked != 0;
+    }
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
+
     private static AppLibraryStore EmptyLibrary()
     {
         var store = new AppLibraryStore(Path.Combine(Path.GetTempPath(),

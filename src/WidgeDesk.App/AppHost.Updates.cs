@@ -41,9 +41,9 @@ internal sealed partial class AppHost
 
     private UpdateClient CreateUpdateClient()
     {
-        // Fallback when update-source.json is absent; keep it pointing at this fork's releases
-        // so a stray build can never offer the upstream author's packages.
-        const string defaultSource = "https://api.github.com/repos/Cyj-090900/WidgeDesk/releases/latest";
+        // 优先用静态清单：它不经过 GitHub API，因此不受匿名限流影响。
+        // 仓库根目录的 latest.json 由发布流程在每次发版时覆盖。
+        const string defaultSource = "https://raw.githubusercontent.com/Cyj-090900/WidgeDesk/main/latest.json";
         var file = Path.Combine(AppContext.BaseDirectory, "update-source.json");
         var source = defaultSource;
         if (File.Exists(file))
