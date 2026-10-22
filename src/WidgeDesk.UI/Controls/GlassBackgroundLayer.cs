@@ -6,7 +6,7 @@ using WidgeDesk.Platform.Displays;
 
 namespace WidgeDesk.UI.Controls;
 
-public enum GlassBackdropSource { Transparent, Wallpaper, LiveDesktop, Opaque, CompatibleScene, Basic }
+public enum GlassBackdropSource { Transparent, Wallpaper, LiveDesktop, Opaque, CompatibleScene, Basic, Custom }
 
 /// <summary>A fixed BGRA snapshot for one glass frame, independent of reused capture buffers.</summary>
 internal sealed class GlassBackgroundFrame : IDisposable
@@ -66,6 +66,8 @@ internal sealed class GlassBackgroundLayer : IDisposable
         new IsolatedDesktopSceneCapture(region, GlassBackdropSource.Wallpaper, trace));
     private long _pendingSince;
     private GlassBackgroundFrame? _basic;
+    private GlassBackgroundFrame? _custom;
+    private (string Color, double Opacity) _customKey;
     private SamplePixelPool _extensionPool = new();
     private bool _sleeping;
     internal bool RequiresBasicBackground { get; private set; }
@@ -74,6 +76,7 @@ internal sealed class GlassBackgroundLayer : IDisposable
 
     public GlassBackgroundFrame? Capture(PixelRect region, int width, int height, double radius, bool allowDesktop)
     {
+        if (TryCustom(width, height) is { } custom) return custom;
         if (WidgeDesk.UI.BackdropRecovery.RequiresBasicRendering)
         {
             RequiresBasicBackground = true;
@@ -149,6 +152,56 @@ internal sealed class GlassBackgroundLayer : IDisposable
         return _basic;
     }
 
+    /// <summary>
+    /// 用户指定的背景色优先于一切取样。
+    /// </summary>
+    /// <remarks>
+    /// 这条路径必须在 <see cref="Capture"/> 最前面判定：桌面取样失败时会退回
+    /// <see cref="Basic"/>，那块颜色既不受设置控制，也无法让用户选成透明。
+    /// 自定义背景一旦启用就完全绕开捕获会话，连辅助进程都不会启动。
+    /// </remarks>
+    private GlassBackgroundFrame? TryCustom(int width, int height)
+    {
+        var appearance = WidgeDesk.UI.Theming.ThemeService.Current?.Appearance;
+        if (appearance is not { UseCustomBackground: true })
+        {
+            if (_custom is not null) { _custom.Dispose(); _custom = null; }
+            return null;
+        }
+
+        var key = (appearance.CustomBackgroundColor, appearance.CustomBackgroundOpacity);
+        if (_custom is not null && _customKey == key && _custom.Width == width && _custom.Height == height)
+            return _custom;
+
+        _custom?.Dispose();
+        _custom = null;
+        var color = ParseColor(key.Item1);
+        // 0 不透明度会让分层窗口在该处变成真 alpha 0，点击会穿透到桌面。
+        // 留 1/255 既肉眼不可见，又能保住命中测试。
+        var alpha = (byte)Math.Clamp((int)Math.Round(key.Item2 * 255), 1, 255);
+        if (key.Item2 <= 0) alpha = 1;
+        var pixels = new byte[checked(width * height * 4)];
+        for (var i = 0; i < pixels.Length; i += 4)
+        { pixels[i] = color.B; pixels[i + 1] = color.G; pixels[i + 2] = color.R; pixels[i + 3] = alpha; }
+        _custom = GlassBackgroundFrame.FromOwnedPixels(pixels, width, height, GlassBackdropSource.Custom);
+        _customKey = key;
+        LastCaptureTiming = new(System.Diagnostics.Stopwatch.GetTimestamp(),
+            System.Diagnostics.Stopwatch.GetTimestamp(), System.Diagnostics.Stopwatch.GetTimestamp(),
+            new { samples = 1, nearBlackFraction = 0d, transparentFraction = 0d, meanChannel = 0d });
+        return _custom;
+    }
+
+    /// <summary>解析 <c>#RRGGBB</c>；设置层已经规范化过，这里只做兜底。</summary>
+    private static System.Windows.Media.Color ParseColor(string value)
+    {
+        if (value.Length == 7 && value[0] == '#'
+            && byte.TryParse(value.AsSpan(1, 2), System.Globalization.NumberStyles.HexNumber, null, out var r)
+            && byte.TryParse(value.AsSpan(3, 2), System.Globalization.NumberStyles.HexNumber, null, out var g)
+            && byte.TryParse(value.AsSpan(5, 2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+            return System.Windows.Media.Color.FromRgb(r, g, b);
+        return System.Windows.Media.Color.FromRgb(0x1E, 0x1F, 0x24);
+    }
+
     public void Suspend()
     {
         _compatible.Suspend();
@@ -174,6 +227,7 @@ internal sealed class GlassBackgroundLayer : IDisposable
         _compatible.Dispose();
         _wallpaperFeed.Dispose();
         _basic = null;
+        _custom?.Dispose(); _custom = null;
         LastCaptureTiming = null;
         _pendingSince = 0; RequiresBasicBackground = false;
     }

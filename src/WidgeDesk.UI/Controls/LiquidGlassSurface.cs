@@ -380,6 +380,23 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
             _frame = null; _lastSource = null; _background.Dispose();
             SetTimerInterval(TimeSpan.FromMilliseconds(200)); InvalidateVisual(); return;
         }
+        if (ThemeService.Current?.Appearance.UseCustomBackground == true)
+        {
+            // 自定义背景没有任何需要持续采样的内容：停掉采集与渲染时钟，
+            // 让面板只按设置里的颜色绘制。
+            if (BackdropSource != GlassBackdropSource.Custom || _frame is not null || _transitionBackdrop is not null)
+            {
+                _worker.Invalidate();
+                _worker.ClearCachedBuffers();
+                BackdropSource = GlassBackdropSource.Custom;
+                _frame = null; _transitionBackdrop = null; _lastSource = null;
+                _background.Suspend();
+                UpdateTransitionLayer();
+            }
+            SetTimerInterval(TimeSpan.FromMilliseconds(200));
+            InvalidateVisual();
+            return;
+        }
         // Capture and WPF state stay on the dispatcher. Do not acquire or enqueue another
         // frame while the immutable previous capture is being composed off the UI thread.
         if (_worker.IsBusy) return;
@@ -498,6 +515,12 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
         if (kind == GlassBackdropSource.Basic)
         {
             // Capture, CPU optics and shader are all optional for this readable body.
+            _worker.Invalidate(); _frame = null; _transitionBackdrop = null; _lastSource = null;
+            UpdateTransitionLayer(); InvalidateVisual(); return;
+        }
+        if (kind == GlassBackdropSource.Custom)
+        {
+            // 用户选定的颜色必须原样呈现：再过一遍镜头与着色只会把它染成另一种颜色。
             _worker.Invalidate(); _frame = null; _transitionBackdrop = null; _lastSource = null;
             UpdateTransitionLayer(); InvalidateVisual(); return;
         }
@@ -651,7 +674,8 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
         var glass = Window.GetWindow(this) as GlassWindow;
         var radius = _panelShape is null ? glass?.PanelCornerRadius.TopLeft ?? 40 : _panelRadius;
         _lastRenderTicks = Stopwatch.GetTimestamp(); ++_renderCount;
-        _lastRenderMaterialReady = ThemeService.Current?.UseOpaquePanels == true || _background.RequiresBasicBackground
+        _lastRenderMaterialReady = ThemeService.Current?.Appearance.UseCustomBackground == true
+            || ThemeService.Current?.UseOpaquePanels == true || _background.RequiresBasicBackground
             || _frame is not null && _sampledGlassPanelBounds == rect && _sampledGlassPanelRadius == radius
             || _transitionBackdrop is not null && _transitionBackdropBounds.Contains(rect)
             || _compatibilityBackdrop is not null && _compatibilityLayer.Opacity > 0
@@ -686,6 +710,12 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
         }
 
         dc.PushClip(CreatePanel(rect, radius));
+        if (ThemeService.Current?.Appearance.UseCustomBackground == true)
+        {
+            dc.DrawRectangle(CustomBackgroundBrush(), null, rect);
+            dc.Pop();
+            return;
+        }
         if (ThemeService.Current?.UseOpaquePanels == true || BackdropRecovery.RequiresBasicRendering)
         {
             dc.DrawRectangle(new SolidColorBrush(dark ? Color.FromRgb(28, 29, 34) : Color.FromRgb(246, 247, 250)), null, rect);
@@ -780,6 +810,27 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
         }
     }
 
+    /// <summary>
+    /// 自定义背景的画刷。
+    /// </summary>
+    /// <remarks>
+    /// 与 <c>GlassBackgroundLayer.TryCustom</c> 用同一份设置，但这里直接画而不经过
+    /// 采样帧：面板的绘制路径每个渲染帧都会走，能立刻反映滑杆变化，
+    /// 也不必为一个纯色额外复制一份整块像素。
+    /// </remarks>
+    private static Brush CustomBackgroundBrush()
+    {
+        var appearance = ThemeService.Current?.Appearance;
+        var color = appearance?.CustomBackgroundColor ?? AppearanceSettings.DefaultCustomBackgroundColor;
+        var opacity = appearance?.CustomBackgroundOpacity ?? AppearanceSettings.DefaultCustomBackgroundOpacity;
+        // 全透明时保留 1/255，否则分层窗口在该处变成真 alpha 0，点击会穿透。
+        var alpha = (byte)Math.Clamp((int)Math.Round(opacity * 255), 1, 255);
+        return new SolidColorBrush(Color.FromArgb(alpha,
+            byte.Parse(color.AsSpan(1, 2), System.Globalization.NumberStyles.HexNumber),
+            byte.Parse(color.AsSpan(3, 2), System.Globalization.NumberStyles.HexNumber),
+            byte.Parse(color.AsSpan(5, 2), System.Globalization.NumberStyles.HexNumber)));
+    }
+
     private void DrawCompatibilityNotice(DrawingContext dc, Rect rect, string text, bool dark)
     {
         if (rect.Height < 120 || rect.Width < 300) return;
@@ -811,6 +862,14 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
 
     private void UpdateTransitionLayer(Size? layoutSize = null)
     {
+        if (ThemeService.Current?.Appearance.UseCustomBackground == true)
+        {
+            // 自定义背景是用户选的实色。兼容层与过渡层都是取样结果，
+            // 留着它们会盖在实色上面，看上去像是"颜色没生效"。
+            _transitionLayer.SetBackdrop(null); _transitionLayer.Opacity = 0;
+            _compatibilityLayer.SetBackdrop(null); _compatibilityLayer.Opacity = 0;
+            return;
+        }
         var size = layoutSize ?? RenderSize;
         var panel = _panelShape ?? new Rect(size);
         var radius = _panelShape is null ? (Window.GetWindow(this) as GlassWindow)?.PanelCornerRadius.TopLeft ?? 40 : _panelRadius;
@@ -922,6 +981,7 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
     /// <summary>Prepare current, fully filtered glass before a hidden launcher becomes visible.</summary>
     public void PrepareRevealMaterial(PixelRect host, PixelRect panel, double dpi)
     {
+        if (ThemeService.Current?.Appearance.UseCustomBackground == true) return;
         if (Window.GetWindow(this) is not { } revealOwner
             || revealOwner.IsVisible && IsBackdropActive?.Invoke() != false || ThemeService.Current?.UseOpaquePanels == true
             || BackdropRecovery.RequiresBasicRendering || host.Width <= 0 || host.Height <= 0) return;

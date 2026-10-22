@@ -195,6 +195,27 @@
                 <TextBlock Text="透明" TextAlignment="Right" />
               </DockPanel>
               <TextBlock Margin="0,6,0,0" Text="分别调节 Dock 和启动台的玻璃透明度。默认 Dock 90%、启动台 20%。" TextWrapping="Wrap" />
+              <CheckBox x:Name="CustomBackgroundCheck" Margin="0,14,0,0" Content="使用自定义背景色"
+                        AutomationProperties.Name="使用自定义背景色"
+                        Checked="OnAppearanceControlChanged" Unchecked="OnAppearanceControlChanged" />
+              <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                         Text="开启后不再取样桌面，Dock 与启动台直接使用下面的颜色与不透明度；不透明度为 0 时该颜色完全不可见。" />
+              <TextBlock Margin="0,10,0,4" Text="背景颜色（#RRGGBB）" />
+              <TextBox x:Name="CustomBackgroundColorBox" Width="140" HorizontalAlignment="Left"
+                       AutomationProperties.Name="自定义背景颜色"
+                       TextChanged="OnCustomBackgroundColorChanged" />
+              <TextBlock Margin="0,12,0,4" Text="背景不透明度" />
+              <DockPanel>
+                <TextBlock x:Name="CustomBackgroundOpacityValue" DockPanel.Dock="Right" Width="48" TextAlignment="Right" />
+                <Slider x:Name="CustomBackgroundOpacitySlider" Minimum="0" Maximum="1" Value="1"
+                        SmallChange="0.01" LargeChange="0.1" IsMoveToPointEnabled="True"
+                        AutomationProperties.Name="自定义背景不透明度"
+                        ValueChanged="OnCustomBackgroundOpacityChanged" />
+              </DockPanel>
+              <DockPanel Margin="0,4,0,0">
+                <TextBlock DockPanel.Dock="Left" Text="全透明" />
+                <TextBlock Text="不透明" TextAlignment="Right" />
+              </DockPanel>
               <CheckBox x:Name="ReduceMotionCheck" Margin="0,10,0,0" Content="减少动画"
                         AutomationProperties.Name="减少动画" Checked="OnAppearanceControlChanged" Unchecked="OnAppearanceControlChanged" />
               <TextBlock x:Name="AppearanceStatus" Margin="0,8,0,12" TextWrapping="Wrap" AutomationProperties.Name="外观设置状态" />

@@ -60,6 +60,8 @@ public static class SettingsPageEditor
             || !Range(settings.Appearance.GlassBackgroundClarity, 0, 1)
             || !Range(settings.Appearance.DockGlassTransparency, 0, 1)
             || !Range(settings.Appearance.LauncherGlassTransparency, 0, 1)
+            || !Range(settings.Appearance.CustomBackgroundOpacity, 0, 1)
+            || !IsColor(settings.Appearance.CustomBackgroundColor)
             || !Enum.IsDefined(settings.Appearance.Theme)
             || !Enum.IsDefined(settings.Appearance.GlassMaterial)) return "外观数值超出允许范围。";
         var shortcuts = settings.Shortcuts;
@@ -74,5 +76,14 @@ public static class SettingsPageEditor
             if (!seen.Add(chord)) return "多个操作使用了同一个快捷键。";
         }
         return null;
+    }
+
+    /// <summary>色值必须是 <c>#RRGGBB</c>；写坏的设置不该静默变成黑块。</summary>
+    private static bool IsColor(string? value)
+    {
+        if (value is null || value.Length != 7 || value[0] != '#') return false;
+        for (var i = 1; i < value.Length; i++)
+            if (!Uri.IsHexDigit(value[i])) return false;
+        return true;
     }
 }

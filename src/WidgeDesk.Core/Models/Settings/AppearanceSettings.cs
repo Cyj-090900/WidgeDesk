@@ -10,6 +10,8 @@ public sealed class AppearanceSettings
     public const double DefaultGlassBackgroundClarity = .5;
     public const double DefaultDockGlassTransparency = .9;
     public const double DefaultLauncherGlassTransparency = .2;
+    public const string DefaultCustomBackgroundColor = "#1E1F24";
+    public const double DefaultCustomBackgroundOpacity = 1;
 
     public double DockGlassTransparency { get; set; } = DefaultDockGlassTransparency;
     public double LauncherGlassTransparency { get; set; } = DefaultLauncherGlassTransparency;
@@ -19,6 +21,28 @@ public sealed class AppearanceSettings
 
     /// <summary>Only the glass body veil; never multiplies refraction, lighting or layer alpha.</summary>
     public double GlassTintOpacity { get; set; } = DefaultGlassTintOpacity;
+
+    /// <summary>
+    /// 用自定义纯色替代桌面取样。
+    /// </summary>
+    /// <remarks>
+    /// 桌面取样依赖系统的窗口捕获接口。实测在部分 Windows 10 构建上该接口直接返回
+    /// <c>E_INVALIDARG</c>，此时 Dock 与启动台只能退化成一块不受控的兜底色。
+    /// 打开这个开关后，面板颜色完全由用户决定，不再受系统能力影响。
+    /// </remarks>
+    public bool UseCustomBackground { get; set; }
+
+    /// <summary>自定义背景色，格式为 <c>#RRGGBB</c>。</summary>
+    public string CustomBackgroundColor { get; set; } = DefaultCustomBackgroundColor;
+
+    /// <summary>
+    /// 自定义背景的不透明度，0 为全透明。
+    /// </summary>
+    /// <remarks>
+    /// 全透明时不绘制任何像素，但会保留 1/255 的 alpha：分层窗口按像素 alpha 做命中测试，
+    /// 真 0 会让整块面板变成点击穿透，Dock 图标就点不到了。
+    /// </remarks>
+    public double CustomBackgroundOpacity { get; set; } = DefaultCustomBackgroundOpacity;
 
     /// <summary>Shared liquid glass material; legacy selections normalize on load and save.</summary>
     public GlassMaterialMode GlassMaterial { get; set; } = GlassMaterialMode.AndroidLiquidGlass;

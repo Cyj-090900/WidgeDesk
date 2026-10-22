@@ -68,8 +68,29 @@ public sealed class WidgeDeskSettings
             ? Math.Clamp(Appearance.GlassTintOpacity, 0, 1) : AppearanceSettings.DefaultGlassTintOpacity;
         Appearance.GlassBackgroundClarity = double.IsFinite(Appearance.GlassBackgroundClarity)
             ? Math.Clamp(Appearance.GlassBackgroundClarity, 0, 1) : AppearanceSettings.DefaultGlassBackgroundClarity;
+        Appearance.CustomBackgroundOpacity = double.IsFinite(Appearance.CustomBackgroundOpacity)
+            ? Math.Clamp(Appearance.CustomBackgroundOpacity, 0, 1) : AppearanceSettings.DefaultCustomBackgroundOpacity;
+        Appearance.CustomBackgroundColor = NormalizeColor(Appearance.CustomBackgroundColor);
 
         Shortcuts.Normalize();
         DesktopTaskbar.Normalize();
+    }
+
+    /// <summary>
+    /// 把颜色收成 <c>#RRGGBB</c>；无法解析时退回默认值。
+    /// </summary>
+    /// <remarks>
+    /// 这个文件允许手工编辑。写坏的色值不应让整个外观失效，
+    /// 也不该让 Dock 变成没有颜色的黑块。
+    /// </remarks>
+    private static string NormalizeColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return AppearanceSettings.DefaultCustomBackgroundColor;
+        var text = value.Trim();
+        if (text.Length == 9 && text[0] == '#') text = text[3..];
+        if (text.Length != 7 || text[0] != '#') return AppearanceSettings.DefaultCustomBackgroundColor;
+        for (var i = 1; i < text.Length; i++)
+            if (!Uri.IsHexDigit(text[i])) return AppearanceSettings.DefaultCustomBackgroundColor;
+        return text.ToUpperInvariant();
     }
 }

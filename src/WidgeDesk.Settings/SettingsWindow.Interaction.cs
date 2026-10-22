@@ -97,8 +97,16 @@ public partial class SettingsWindow
             LauncherTransparencySlider.Value = appearance.LauncherGlassTransparency;
             DockTransparencyValue.Text = appearance.DockGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
             LauncherTransparencyValue.Text = appearance.LauncherGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
+            CustomBackgroundCheck.IsChecked = appearance.UseCustomBackground;
+            CustomBackgroundColorBox.Text = appearance.CustomBackgroundColor;
+            CustomBackgroundOpacitySlider.Value = appearance.CustomBackgroundOpacity;
+            CustomBackgroundOpacityValue.Text = appearance.CustomBackgroundOpacity.ToString("P0", CultureInfo.CurrentCulture);
+            // A failed read must not leave a half-edited value behind.
+            CustomBackgroundColorBox.BorderBrush = null;
             ReduceMotionCheck.IsChecked = appearance.ReduceMotion;
-            AppearanceStatus.Text = "设置面板固定使用深色不透明背景；玻璃透明度应用到 Dock 和启动台。";
+            AppearanceStatus.Text = appearance.UseCustomBackground
+                ? "设置面板固定使用深色不透明背景；Dock 与启动台使用自定义背景色。"
+                : "设置面板固定使用深色不透明背景；玻璃透明度应用到 Dock 和启动台。";
         }
         finally { _loadingAppearanceControls = false; }
     }
@@ -111,7 +119,51 @@ public partial class SettingsWindow
         current.Appearance.GlassMaterial = AppearanceMaterialCombo.SelectedIndex == 1
             ? GlassMaterialMode.FrostedGlass : GlassMaterialMode.AndroidLiquidGlass;
         current.Appearance.ReduceMotion = ReduceMotionCheck.IsChecked == true;
+        current.Appearance.UseCustomBackground = CustomBackgroundCheck.IsChecked == true;
         SavePageSnapshot(snapshot, "外观", AppearanceStatus);
+    }
+
+    /// <summary>
+    /// 只有输入已经是一个完整的 <c>#RRGGBB</c> 时才写设置。
+    /// </summary>
+    /// <remarks>
+    /// 逐字输入过程中必然出现 <c>#</c>、<c>#1E</c> 这样的中间状态。
+    /// 若每次都保存，用户还没输完就会被判定为无效并回滚输入框，
+    /// 结果是一个字都打不进去。
+    /// </remarks>
+    private void OnCustomBackgroundColorChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loadingAppearanceControls || !IsInitialized || _dataStore is null) return;
+        var text = CustomBackgroundColorBox.Text.Trim();
+        if (!IsCompleteColor(text))
+        {
+            CustomBackgroundColorBox.BorderBrush = System.Windows.Media.Brushes.IndianRed;
+            return;
+        }
+        CustomBackgroundColorBox.BorderBrush = null;
+        var current = _dataStore.Settings.Current;
+        if (string.Equals(current.Appearance.CustomBackgroundColor, text, StringComparison.OrdinalIgnoreCase)) return;
+        var snapshot = SettingsPageEditor.Clone(current);
+        current.Appearance.CustomBackgroundColor = text.ToUpperInvariant();
+        SavePageSnapshot(snapshot, "外观", AppearanceStatus);
+    }
+
+    /// <summary>判断文本是否是一个可以直接采用的颜色值。</summary>
+    private static bool IsCompleteColor(string text) => text.Length == 7 && text[0] == '#'
+        && text.Skip(1).All(Uri.IsHexDigit);
+
+    private void OnCustomBackgroundOpacityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_loadingAppearanceControls || !IsInitialized || _dataStore is null) return;
+        var current = _dataStore.Settings.Current;
+        var value = Math.Clamp(CustomBackgroundOpacitySlider.Value, 0, 1);
+        CustomBackgroundOpacityValue.Text = value.ToString("P0", CultureInfo.CurrentCulture);
+        if (Math.Abs(current.Appearance.CustomBackgroundOpacity - value) < .0005) return;
+        var snapshot = SettingsPageEditor.Clone(current);
+        current.Appearance.CustomBackgroundOpacity = value;
+        SavePageSnapshot(snapshot, "外观", AppearanceStatus);
+        if (ThemeService.Current is { } theme && !ReferenceEquals(theme.Appearance, current.Appearance))
+            theme.Update(current.Appearance);
     }
 
     private void OnGlassTransparencyChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
