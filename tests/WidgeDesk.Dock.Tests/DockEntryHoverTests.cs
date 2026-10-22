@@ -13,6 +13,7 @@ public sealed class DockEntryHoverTests
     [InlineData("LauncherButton", "LaunchpadTile")]
     [InlineData("ThisPcButton", "ThisPcTile")]
     [InlineData("DesktopIconsButton", "DesktopIconsTile")]
+    [InlineData("SettingsButton", "SettingsTile")]
     public void BuiltinEntryUsesTheSameScaleCurveAsAppTilesAndReturnsToRest(string buttonName, string iconName)
     {
         StaTest.Run(() =>

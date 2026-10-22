@@ -92,7 +92,6 @@ public partial class SettingsWindow
         try
         {
             var appearance = _dataStore.Settings.Current.Appearance;
-            AppearanceMaterialCombo.SelectedIndex = appearance.GlassMaterial == GlassMaterialMode.FrostedGlass ? 1 : 0;
             DockTransparencySlider.Value = appearance.DockGlassTransparency;
             LauncherTransparencySlider.Value = appearance.LauncherGlassTransparency;
             DockTransparencyValue.Text = appearance.DockGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
@@ -116,8 +115,6 @@ public partial class SettingsWindow
         if (_loadingAppearanceControls || _dataStore is null) return;
         var current = _dataStore.Settings.Current;
         var snapshot = SettingsPageEditor.Clone(current);
-        current.Appearance.GlassMaterial = AppearanceMaterialCombo.SelectedIndex == 1
-            ? GlassMaterialMode.FrostedGlass : GlassMaterialMode.AndroidLiquidGlass;
         current.Appearance.ReduceMotion = ReduceMotionCheck.IsChecked == true;
         current.Appearance.UseCustomBackground = CustomBackgroundCheck.IsChecked == true;
         SavePageSnapshot(snapshot, "外观", AppearanceStatus);

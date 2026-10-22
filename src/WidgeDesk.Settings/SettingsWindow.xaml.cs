@@ -190,6 +190,7 @@ public partial class SettingsWindow : GlassWindow
             ShowLauncherEntryCheckBox.IsChecked = dock.ShowLauncherEntry;
             ShowThisPcEntryCheckBox.IsChecked = dock.ShowThisPcEntry;
             ShowDesktopIconsEntryCheckBox.IsChecked = dock.ShowDesktopIconsEntry;
+            ShowSettingsEntryCheckBox.IsChecked = dock.ShowSettingsEntry;
             DockScaleSlider.Value = dock.SizeScale;
             DockScaleReadout.Text = $"{dock.SizeScale:P0} · 图标 {48 * dock.SizeScale:0} DIP";
             DockPlacementCombo.SelectedIndex = (int)dock.Placement;
@@ -201,7 +202,7 @@ public partial class SettingsWindow : GlassWindow
                 : display.ToDips((int)display.WorkArea.Width) - 32;
             var maximum = Math.Min(DockSettings.MaximumFrameLengthDip, Math.Max(64, availableWidthDip));
             var entryCount = (dock.ShowLauncherEntry ? 1 : 0) + (dock.ShowThisPcEntry ? 1 : 0)
-                + (dock.ShowDesktopIconsEntry ? 1 : 0);
+                + (dock.ShowDesktopIconsEntry ? 1 : 0) + (dock.ShowSettingsEntry ? 1 : 0);
             var minimum = Math.Min(Math.Max(DockSettings.MinimumFrameLengthDip,
                 22 + (DockSettings.FixedIconSize + DockSettings.FixedIconSpacing) * entryCount) * dock.SizeScale, maximum);
             DockFrameLengthSlider.Minimum = minimum;
@@ -358,6 +359,7 @@ public partial class SettingsWindow : GlassWindow
             ShowLauncherEntry = ShowLauncherEntryCheckBox.IsChecked == true,
             ShowThisPcEntry = ShowThisPcEntryCheckBox.IsChecked == true,
             ShowDesktopIconsEntry = ShowDesktopIconsEntryCheckBox.IsChecked == true,
+            ShowSettingsEntry = ShowSettingsEntryCheckBox.IsChecked == true,
             IconSize = DockSettings.FixedIconSize,
             IconSpacing = DockSettings.FixedIconSpacing,
             MagnificationPeak = DockSettings.FixedMagnificationPeak,

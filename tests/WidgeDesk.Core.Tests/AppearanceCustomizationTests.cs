@@ -7,7 +7,7 @@ namespace WidgeDesk.Core.Tests;
 public sealed class AppearanceCustomizationTests
 {
     [Fact]
-    public void FrostedChoiceSurvivesSavingAndReloadingWithoutChangingTransparency()
+    public void LegacyFrostedChoiceLoadsAsLiquidGlassWithoutLosingTransparency()
     {
         using var temp = new TempDataDirectory();
         var store = new SettingsStore(temp.Paths.SettingsFile);
@@ -16,7 +16,8 @@ public sealed class AppearanceCustomizationTests
         store.Current.Appearance.DockGlassTransparency = .75;
         store.Save();
         store.Load();
-        Assert.Equal((GlassMaterialMode)2, store.Current.Appearance.GlassMaterial);
+        // 磨砂已下线：旧文件仍要能读出来，但必须归一成液态玻璃，而不是报「配置损坏」。
+        Assert.Equal(GlassMaterialMode.AndroidLiquidGlass, store.Current.Appearance.GlassMaterial);
         Assert.Equal(.75, store.Current.Appearance.DockGlassTransparency);
         Assert.Equal(.2, store.Current.Appearance.LauncherGlassTransparency);
         Assert.Equal(GlassMaterialMode.AndroidLiquidGlass,

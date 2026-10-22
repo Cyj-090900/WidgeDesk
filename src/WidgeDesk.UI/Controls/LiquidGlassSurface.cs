@@ -413,7 +413,7 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
         var material = ThemeService.Current?.Appearance.GlassMaterial ?? GlassMaterialMode.AndroidLiquidGlass;
         var dark = ThemeService.Current?.IsDark != false;
         var backgroundClarity = BackgroundClarity;
-        var useAndroidGlass = (material is GlassMaterialMode.AndroidLiquidGlass or GlassMaterialMode.FrostedGlass)
+        var useAndroidGlass = material == GlassMaterialMode.AndroidLiquidGlass
             && debugView == LiquidGlassDebugView.None;
         var transitionCapture = useAndroidGlass ? _transitionCaptureBounds : null;
         var transitionBackdrop = transitionCapture is not null;
@@ -724,7 +724,7 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
         }
         var compatibleChrome = debugView == LiquidGlassDebugView.None && (_frameUsesAndroidGlass
             || _frame is null && (ThemeService.Current?.Appearance.GlassMaterial ?? GlassMaterialMode.AndroidLiquidGlass)
-                is GlassMaterialMode.AndroidLiquidGlass or GlassMaterialMode.FrostedGlass);
+                == GlassMaterialMode.AndroidLiquidGlass);
         var opticalFrameMatches = _frame is not null && _sampledGlassPanelBounds == rect
             && _sampledGlassPanelRadius == radius;
         var useTransitionMaterial = _transitionCaptureBounds is not null || !opticalFrameMatches;
@@ -880,11 +880,10 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
             && LiquidGlassDebugState.View == LiquidGlassDebugView.None
             && ThemeService.Current?.UseOpaquePanels != true
             && (ThemeService.Current?.Appearance.GlassMaterial ?? GlassMaterialMode.AndroidLiquidGlass)
-                is GlassMaterialMode.AndroidLiquidGlass or GlassMaterialMode.FrostedGlass;
+                == GlassMaterialMode.AndroidLiquidGlass;
         _transitionLayer.SetBackdrop(enabled ? _transitionBackdrop : null);
         _transitionLayer.Opacity = enabled ? 1 : 0;
-        var frosted = ThemeService.Current?.Appearance.GlassMaterial == GlassMaterialMode.FrostedGlass;
-        if (enabled) _transitionLayer.SetPanel(panel, _transitionBackdropBounds, radius, .6 + .4 * _transitionProgress, UseLaunchpadOptics, frosted);
+        if (enabled) _transitionLayer.SetPanel(panel, _transitionBackdropBounds, radius, .6 + .4 * _transitionProgress, UseLaunchpadOptics);
         var liveReady = !_background.RequiresBasicBackground && (enabled || opticalMatches);
         var needsCompatibility = ThemeService.Current?.UseOpaquePanels != true
             && !BackdropRecovery.RequiresBasicRendering && LiquidGlassDebugState.View == LiquidGlassDebugView.None
@@ -901,7 +900,7 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
                 _compatibilityLayer.Clip = _panelGeometry ?? (Window.GetWindow(this) is GlassWindow glass
                     ? glass.CreateGlassPanelGeometry(panel, radius) : SquircleGlassGeometry.Create(panel, radius));
             }
-            _compatibilityLayer.SetPanel(panel, _compatibilityBounds, radius, .6 + .4 * _transitionProgress, UseLaunchpadOptics, frosted);
+            _compatibilityLayer.SetPanel(panel, _compatibilityBounds, radius, .6 + .4 * _transitionProgress, UseLaunchpadOptics);
             _compatibilityLayer.Opacity = opacity;
             if (opacity == 0)
             {
@@ -916,11 +915,8 @@ public sealed class LiquidGlassSurface : FrameworkElement, IDisposable
     private static void RenderMaterialBackdropInto(GlassMaterialMode material, byte[] source, byte[] pixels,
         byte[] scratch, int width, int height, Size size, bool dark, double strength, double clarity, bool launchpad)
     {
-        if (material == GlassMaterialMode.FrostedGlass)
-            AndroidLiquidGlassRenderer.RenderFrostedBackdropInto(source, pixels, scratch, width, height, size, dark, strength, clarity);
-        else
-            AndroidLiquidGlassRenderer.RenderTransitionBackdropInto(source, pixels, scratch, width, height, size, dark, strength,
-                backgroundClarity: clarity, launchpadOptics: launchpad);
+        AndroidLiquidGlassRenderer.RenderTransitionBackdropInto(source, pixels, scratch, width, height, size, dark, strength,
+            backgroundClarity: clarity, launchpadOptics: launchpad);
     }
 
     private MaterialStamp ReadMaterialStamp()

@@ -166,12 +166,8 @@
               <TextBlock x:Name="AppearanceSectionHeading" FontSize="16" FontWeight="SemiBold" Text="外观"
                          Foreground="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
               <TextBlock Margin="0,12,0,4" Text="玻璃效果" />
-              <ComboBox x:Name="AppearanceMaterialCombo" AutomationProperties.Name="玻璃效果"
-                        SelectionChanged="OnAppearanceControlChanged">
-                <ComboBoxItem Content="液态玻璃" />
-                <ComboBoxItem Content="磨砂玻璃" />
-              </ComboBox>
-              <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Text="液态玻璃保留折射与边缘光泽；磨砂玻璃柔化背景，不产生折射。切换同时应用到 Dock 和启动台。" />
+              <TextBlock Margin="0,0,0,4" TextWrapping="Wrap"
+                         Text="液态玻璃保留折射与边缘光泽，同时应用到 Dock 和启动台。" />
               <TextBlock Margin="0,12,0,4" Text="Dock 透明度" />
               <DockPanel>
                 <TextBlock x:Name="DockTransparencyValue" DockPanel.Dock="Right" Width="48" TextAlignment="Right" />
@@ -231,7 +227,9 @@
                         AutomationProperties.Name="Dock 显示此电脑" Checked="OnDockControlChanged" Unchecked="OnDockControlChanged" />
               <CheckBox x:Name="ShowDesktopIconsEntryCheckBox" Content="显示切换桌面图标" Margin="0,4"
                         AutomationProperties.Name="Dock 显示切换桌面图标" Checked="OnDockControlChanged" Unchecked="OnDockControlChanged" />
-              <TextBlock Margin="0,4,0,10" TextWrapping="Wrap" Text="按启动台、此电脑、切换桌面图标的顺序固定在左侧。切换桌面图标用于显示或隐藏桌面上的图标。" />
+              <CheckBox x:Name="ShowSettingsEntryCheckBox" Content="显示设置" Margin="0,4"
+                        AutomationProperties.Name="Dock 显示设置" Checked="OnDockControlChanged" Unchecked="OnDockControlChanged" />
+              <TextBlock Margin="0,4,0,10" TextWrapping="Wrap" Text="按启动台、此电脑、切换桌面图标、设置的顺序固定在左侧。切换桌面图标用于显示或隐藏桌面上的图标；设置图标点开即进入本页面。" />
               <TextBlock Margin="0,12,0,4" Text="整体大小" />
               <Slider x:Name="DockScaleSlider" Minimum="0.6666666666666666" Maximum="1.5"
                       SmallChange="0.05" LargeChange="0.1" IsMoveToPointEnabled="True"

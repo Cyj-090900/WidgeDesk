@@ -52,10 +52,10 @@ public sealed class WidgeDeskSettings
         Shortcuts.HotCornersEnabled = false;
         Shortcuts.MouseSideButtonsEnabled = false;
 
-        // Keep legacy enum values readable, but product settings have one appearance.
+        // Keep legacy enum values readable, but product settings have one material:
+        // 磨砂已下线，旧文件里的 FrostedGlass 在加载时归一到液态玻璃。
         Appearance.Theme = ThemeMode.Dark;
-        if (Appearance.GlassMaterial != GlassMaterialMode.FrostedGlass)
-            Appearance.GlassMaterial = GlassMaterialMode.AndroidLiquidGlass;
+        Appearance.GlassMaterial = GlassMaterialMode.AndroidLiquidGlass;
         Dock.SizeScale = double.IsFinite(Dock.SizeScale)
             ? Math.Clamp(Dock.SizeScale, DockSettings.MinimumSizeScale, DockSettings.MaximumSizeScale) : 1;
         // Settings now owns its opaque surface instead of changing every window.

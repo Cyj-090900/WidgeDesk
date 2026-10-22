@@ -78,44 +78,31 @@ internal static partial class Program
                 hostType.GetMethod("ShowSettings", flags)!.Invoke(host, null);
             }
             size.Value = 1;
-            var material = (ComboBox)settings.FindName("AppearanceMaterialCombo")!;
-            foreach (var index in new[] { 1, 0, 1 })
-            {
-                hostType.GetMethod("ShowSettings", flags)!.Invoke(host, null);
-                ((ListBox)settings.FindName("SettingsPageList")!).SelectedIndex = 0;
-                material.SelectedIndex = index;
-                Pump(TimeSpan.FromMilliseconds(300));
-                var expected = index == 1 ? GlassMaterialMode.FrostedGlass : GlassMaterialMode.AndroidLiquidGlass;
-                var reloaded = new SettingsStore(Path.Combine(directory, "Data", "settings.json")); reloaded.Load();
-                Check("玻璃选择保存并即时广播到主题", "appearance/material",
-                    ThemeService.Current!.Appearance.GlassMaterial == expected && reloaded.Current.Appearance.GlassMaterial == expected,
-                    expected.ToString(), reloaded.Current.Appearance.GlassMaterial.ToString());
-                Capture(settings, Path.Combine(evidence, $"settings-{expected}.png"));
-                settings.Hide();
-                hostType.GetMethod("ShowLauncher", flags, null, Type.EmptyTypes, null)!.Invoke(host, null);
-                var surface = (LiquidGlassSurface)launcher.FindName("GlassSurface")!;
-                Check("切换材质后启动台提供完整背景", "appearance/reveal",
-                    PumpUntil(() => launcher.IsVisible && SurfaceSnapshot(launcher).GetProperty("lastRenderMaterialReady").GetBoolean(), TimeSpan.FromSeconds(5)),
-                    "material ready", SurfaceSnapshot(launcher).ToString());
-                Pump(TimeSpan.FromMilliseconds(400));
-                Check("材质切换后实时背景恢复", "appearance/live",
-                    PumpUntil(() => surface.BackdropSource is GlassBackdropSource.LiveDesktop or GlassBackdropSource.CompatibleScene,
-                        TimeSpan.FromSeconds(5)), "live desktop or compatible scene", surface.BackdropSource.ToString());
-                Capture(launcher, Path.Combine(evidence, $"launcher-{expected}.png"));
-                if (index == 1)
-                {
-                    var layers = new[] { "_transitionLayer", "_compatibilityLayer" }
-                        .Select(name => (FrameworkElement)typeof(LiquidGlassSurface).GetField(name, flags)!.GetValue(surface)!)
-                        .Where(layer => layer.Opacity > 0).ToArray();
-                    Check("磨砂开合不使用液态折射着色器", "appearance/no-lens",
-                        layers.Length > 0 && layers.All(layer => !(bool)layer.GetType().GetProperty("UsesGpuLens")!.GetValue(layer)!),
-                        "no active GPU lens", $"{layers.Length} active material layers");
-                }
-                launcher.CloseWithTransition();
-                Pump(TimeSpan.FromMilliseconds(600));
-            }
+            // 磨砂已下线：外观页不应再出现材质选择器，且设置里的旧值必须归一成液态玻璃。
+            Check("外观页不再提供材质选择", "appearance/material",
+                settings.FindName("AppearanceMaterialCombo") is null, "no selector",
+                settings.FindName("AppearanceMaterialCombo")?.GetType().Name ?? "null");
+            var reloadedSettings = new SettingsStore(Path.Combine(directory, "Data", "settings.json"));
+            reloadedSettings.Load();
+            Check("旧材质配置归一为液态玻璃", "appearance/material",
+                ThemeService.Current!.Appearance.GlassMaterial == GlassMaterialMode.AndroidLiquidGlass
+                && reloadedSettings.Current.Appearance.GlassMaterial == GlassMaterialMode.AndroidLiquidGlass,
+                "AndroidLiquidGlass", reloadedSettings.Current.Appearance.GlassMaterial.ToString());
+            Capture(settings, Path.Combine(evidence, "settings-liquid-glass.png"));
+            settings.Hide();
+            hostType.GetMethod("ShowLauncher", flags, null, Type.EmptyTypes, null)!.Invoke(host, null);
+            var surface = (LiquidGlassSurface)launcher.FindName("GlassSurface")!;
+            Check("启动台提供完整背景", "appearance/reveal",
+                PumpUntil(() => launcher.IsVisible && SurfaceSnapshot(launcher).GetProperty("lastRenderMaterialReady").GetBoolean(), TimeSpan.FromSeconds(5)),
+                "material ready", SurfaceSnapshot(launcher).ToString());
+            Pump(TimeSpan.FromMilliseconds(400));
+            Check("启动台实时背景恢复", "appearance/live",
+                PumpUntil(() => surface.BackdropSource is GlassBackdropSource.LiveDesktop or GlassBackdropSource.CompatibleScene,
+                    TimeSpan.FromSeconds(5)), "live desktop or compatible scene", surface.BackdropSource.ToString());
+            Capture(launcher, Path.Combine(evidence, "launcher-liquid-glass.png"));
+            launcher.CloseWithTransition();
+            Pump(TimeSpan.FromMilliseconds(600));
             Check("无失效玻璃着色器", "appearance/shader", shaderFailures == 0, "0", shaderFailures.ToString());
-            material.SelectedIndex = 0;
             hostType.GetMethod("ShowSettings", flags)!.Invoke(host, null);
             ((ListBox)settings.FindName("SettingsPageList")!).SelectedIndex = 1;
             Pump(TimeSpan.FromMilliseconds(200));

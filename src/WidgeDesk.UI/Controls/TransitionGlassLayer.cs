@@ -13,7 +13,6 @@ internal sealed class TransitionGlassLayer : FrameworkElement
     private TransitionGlassEffect? _lens;
     private readonly DrawingGroup _drawing = new();
     private bool _sleeping;
-    private bool _frosted;
     private Rect _panel;
     private double _radius, _strength;
     public bool UsesGpuLens => Effect is TransitionGlassEffect;
@@ -48,16 +47,14 @@ internal sealed class TransitionGlassLayer : FrameworkElement
         _lens = null;
     }
 
-    public void SetPanel(Rect panel, Rect backdropBounds, double radius, double strength, bool launchpadOptics = false,
-        bool frosted = false)
+    public void SetPanel(Rect panel, Rect backdropBounds, double radius, double strength, bool launchpadOptics = false)
     {
         if (backdropBounds.Width <= 0 || backdropBounds.Height <= 0) return;
         _panel = new Rect(panel.X - backdropBounds.X, panel.Y - backdropBounds.Y, panel.Width, panel.Height);
         _radius = radius;
         _strength = strength;
-        _frosted = frosted;
         if (_sleeping) return;
-        if (frosted || WidgeDesk.UI.BackdropRecovery.RequiresBasicRendering || !RenderCapability.IsPixelShaderVersionSupported(3, 0))
+        if (WidgeDesk.UI.BackdropRecovery.RequiresBasicRendering || !RenderCapability.IsPixelShaderVersionSupported(3, 0))
         {
             Effect = null;
             InvalidateVisual();
@@ -86,8 +83,6 @@ internal sealed class TransitionGlassLayer : FrameworkElement
 
     private void DrawBackdrop(DrawingContext dc)
     {
-        if (_frosted && _panel.Width > 0 && _panel.Height > 0)
-            dc.PushClip(SquircleGlassGeometry.Create(_panel, _radius));
         if (_backdrop is not null) dc.DrawImage(_backdrop, new Rect(RenderSize));
         if (_backdrop is not null && !UsesGpuLens && _panel.Width > 0 && _panel.Height > 0)
         {
@@ -99,6 +94,5 @@ internal sealed class TransitionGlassLayer : FrameworkElement
             }, new Point(0, 0), new Point(1, 1));
             dc.DrawGeometry(null, new Pen(rim, 1.5 * _strength), SquircleGlassGeometry.Create(_panel, _radius));
         }
-        if (_frosted && _panel.Width > 0 && _panel.Height > 0) dc.Pop();
     }
 }

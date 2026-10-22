@@ -26,6 +26,8 @@ public sealed class DockSettings
     public bool ShowLauncherEntry { get; set; } = true;
     public bool ShowThisPcEntry { get; set; } = true;
     public bool ShowDesktopIconsEntry { get; set; } = true;
+    /// <summary>直接打开 WidgeDesk 设置中心的入口。</summary>
+    public bool ShowSettingsEntry { get; set; } = true;
 
     /// <summary>
     /// Dock 玻璃外框的横向长度，单位为 DIP。零表示继续按内容自动调整，

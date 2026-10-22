@@ -43,6 +43,9 @@ public partial class DockWindow : GlassWindow
     private Action<PixelRect?>? _toggleLauncher;
     /// <summary>宿主提供与桌面图标快捷键相同的动作，不依赖快捷键是否启用。</summary>
     public Action? ToggleDesktopIcons { get; set; }
+
+    /// <summary>打开 WidgeDesk 设置中心；由宿主注入，Dock 不引用 App 工程。</summary>
+    public Action? OpenSettings { get; set; }
     private System.Windows.Threading.DispatcherTimer? _failureNoticeTimer;
     private readonly DockTileStrip _tileStrip;
 
@@ -600,19 +603,22 @@ public partial class DockWindow : GlassWindow
         DockContentLayer.Margin = new Thickness(10 * scale, 8 * scale, 10 * scale, 8 * scale);
         if ((LauncherButton.Visibility == Visibility.Visible) != settings.ShowLauncherEntry
             || (ThisPcButton.Visibility == Visibility.Visible) != settings.ShowThisPcEntry
-            || (DesktopIconsButton.Visibility == Visibility.Visible) != settings.ShowDesktopIconsEntry)
+            || (DesktopIconsButton.Visibility == Visibility.Visible) != settings.ShowDesktopIconsEntry
+            || (SettingsButton.Visibility == Visibility.Visible) != settings.ShowSettingsEntry)
             ResetEntryHover();
         LauncherButton.Visibility = settings.ShowLauncherEntry ? Visibility.Visible : Visibility.Collapsed;
         ThisPcButton.Visibility = settings.ShowThisPcEntry ? Visibility.Visible : Visibility.Collapsed;
         DesktopIconsButton.Visibility = settings.ShowDesktopIconsEntry ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var button in new[] { LauncherButton, ThisPcButton, DesktopIconsButton })
+        SettingsButton.Visibility = settings.ShowSettingsEntry ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var button in new[] { LauncherButton, ThisPcButton, DesktopIconsButton, SettingsButton })
         {
             button.Width = 48 * scale;
             button.Height = 64 * scale;
             button.Margin = new Thickness(0, 0, 8 * scale, 0);
         }
         LaunchpadTile.Width = LaunchpadTile.Height = ThisPcTile.Width = ThisPcTile.Height
-            = DesktopIconsTile.Width = DesktopIconsTile.Height = 48 * scale;
+            = DesktopIconsTile.Width = DesktopIconsTile.Height
+            = SettingsTile.Width = SettingsTile.Height = 48 * scale;
         LaunchpadTile.CornerRadius = new CornerRadius(16 * scale);
         PanelCornerRadius = new CornerRadius(40 * scale);
 
@@ -635,7 +641,8 @@ public partial class DockWindow : GlassWindow
         ? Math.Clamp(Settings.SizeScale, DockSettings.MinimumSizeScale, DockSettings.MaximumSizeScale) : 1;
 
     private double BuiltinEntryWidthDip => 56 * ((Settings.ShowLauncherEntry ? 1 : 0)
-        + (Settings.ShowThisPcEntry ? 1 : 0) + (Settings.ShowDesktopIconsEntry ? 1 : 0));
+        + (Settings.ShowThisPcEntry ? 1 : 0) + (Settings.ShowDesktopIconsEntry ? 1 : 0)
+        + (Settings.ShowSettingsEntry ? 1 : 0));
 
     private double ResolveEffectiveFrameLengthDip(double requested, DisplayInfo? display)
     {
@@ -1612,6 +1619,8 @@ public partial class DockWindow : GlassWindow
     }
 
     private void OnDesktopIconsButtonClick(object sender, RoutedEventArgs e) => ToggleDesktopIcons?.Invoke();
+
+    private void OnSettingsButtonClick(object sender, RoutedEventArgs e) => OpenSettings?.Invoke();
 
     // ---- 摆放 ----
 

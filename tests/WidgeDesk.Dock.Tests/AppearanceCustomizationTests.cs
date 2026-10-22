@@ -85,7 +85,7 @@ public sealed class AppearanceCustomizationTests
     }
 
     [Fact]
-    public void MaterialSelectorUpdatesThemeAndSavesFrostedChoice()
+    public void AppearancePageNoLongerOffersAMaterialSelectorAndNormalizesLegacyValues()
     {
         StaTest.Run(() =>
         {
@@ -95,44 +95,19 @@ public sealed class AppearanceCustomizationTests
             var window = new SettingsWindow();
             try
             {
+                // 旧文件可能写着磨砂；加载时必须归一成液态玻璃。
+                data.Settings.Current.Appearance.GlassMaterial = GlassMaterialMode.FrostedGlass;
+                data.Settings.Save();
+                var reloaded = new SettingsStore(data.Paths.SettingsFile); reloaded.Load();
+                Assert.Equal(GlassMaterialMode.AndroidLiquidGlass, reloaded.Current.Appearance.GlassMaterial);
                 window.AttachDataStore(data, null);
-                Assert.IsType<ComboBox>(window.FindName("AppearanceMaterialCombo")).SelectedIndex = 1;
-                Assert.Equal((GlassMaterialMode)2, theme.Appearance.GlassMaterial);
-                var reload = new SettingsStore(data.Paths.SettingsFile); reload.Load();
-                Assert.Equal((GlassMaterialMode)2, reload.Current.Appearance.GlassMaterial);
+                Assert.Null(window.FindName("AppearanceMaterialCombo"));
+                Assert.Null(window.FindName("GlassDebugViewCombo"));
                 Assert.IsType<CheckBox>(window.FindName("ReduceMotionCheck")).IsChecked = true;
-                Assert.Equal((GlassMaterialMode)2, theme.Appearance.GlassMaterial);
+                Assert.Equal(GlassMaterialMode.AndroidLiquidGlass, theme.Appearance.GlassMaterial);
             }
             finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
         });
     }
 
-    [Fact]
-    public void FrostedMaterialBlursFineDetailWithoutIntroducingColorSeparation()
-    {
-        const int width = 128, height = 96;
-        var source = new byte[width * height * 4];
-        for (var y = 0; y < height; y++)
-        for (var x = 0; x < width; x++)
-        {
-            var i = (y * width + x) * 4;
-            source[i] = source[i + 1] = source[i + 2] = x % 8 < 4 ? (byte)0 : (byte)255;
-            source[i + 3] = 255;
-        }
-        var frame = LiquidGlassFrameComposer.Compose(new LiquidGlassOptics(), source, width, height,
-            new Size(width, height), 24, true, 1, 0, LiquidGlassDebugView.None,
-            LiquidGlassSamplingParameters.Default, LiquidGlassWeightParameters.Default,
-            new Rect(8, 8, 112, 80), LiquidGlassLodParameters.Default, LiquidGlassFinishingParameters.Default,
-            LiquidGlassBrdfParameters.Default, LiquidGlassDispersionParameters.Default,
-            material: (GlassMaterialMode)2, backgroundClarity: 1);
-        var a = (48 * width + 64) * 4; var b = a + 4 * 4;
-        Assert.InRange(Math.Abs(frame[a] - frame[b]), 0, 25);
-        for (var x = 12; x < 116; x++)
-        {
-            var i = (48 * width + x) * 4;
-            Assert.Equal(frame[i], frame[i + 1]); Assert.Equal(frame[i + 1], frame[i + 2]);
-            Assert.Equal(255, frame[i + 3]);
-        }
-        Assert.Equal(0, frame[3]);
-    }
 }

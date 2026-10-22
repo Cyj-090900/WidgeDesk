@@ -37,7 +37,8 @@ public sealed class GlassMaterialSelectionTests
                 Assert.Same(window.PanelBackgroundBrush, Assert.IsType<Border>(window.Content).Background);
                 Assert.False(theme.Appearance.ReduceTransparency);
                 Assert.Null(window.FindName("AppearanceThemeCombo"));
-                Assert.Equal(0, Assert.IsType<ComboBox>(window.FindName("AppearanceMaterialCombo")).SelectedIndex);
+                // 材质选择器已移除：产品只剩液态玻璃。
+                Assert.Null(window.FindName("AppearanceMaterialCombo"));
                 Assert.Null(window.FindName("GlassDebugViewCombo"));
                 Assert.Null(window.FindName("GlassPerformanceOverlayCheck"));
                 Assert.Null(window.FindName("GlassFaceScaleSlider"));

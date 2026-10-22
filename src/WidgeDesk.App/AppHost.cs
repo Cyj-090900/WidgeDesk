@@ -364,6 +364,7 @@ internal sealed partial class AppHost : IDisposable
         _dock.AttachServices(_services!, _dockSettings!, (PixelRect? source) =>
             ToggleLauncherFromDock(_launcher, source, ShowLauncher));
         _dock.ToggleDesktopIcons = () => ExecuteInteraction(WidgeDesk.Core.Input.InputAction.ToggleDesktopIcons);
+        _dock.OpenSettings = ShowSettings;
         _launcher.AttachServices(_services!, _loadReport?.LibraryStatus != LoadStatus.Unrecoverable);
         _launcher.InternalDragStarted += (_, _) => _dock?.RaiseAboveLauncherDuringDrag();
         _launcher.InternalDragFinished += (_, _) => _launcher?.RaiseAboveDockAfterDrag();

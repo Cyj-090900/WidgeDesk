@@ -206,11 +206,6 @@ internal static class LiquidGlassFrameComposer
         ArgumentNullException.ThrowIfNull(optics);
         ArgumentNullException.ThrowIfNull(sourceBgra);
 
-        if (material == WidgeDesk.Core.Models.GlassMaterialMode.FrostedGlass
-            && debugView == LiquidGlassDebugView.None)
-            return FrostedGlassRenderer.Render(sourceBgra, pixelWidth, pixelHeight, sampleSizeDip,
-                glassBoundsDip, cornerRadiusDip, squircle, dark, refractionStrength, backgroundClarity);
-
         if (material == WidgeDesk.Core.Models.GlassMaterialMode.AndroidLiquidGlass
             && debugView == LiquidGlassDebugView.None)
             return (androidRenderer ?? new AndroidLiquidGlassRenderer()).Render(sourceBgra,

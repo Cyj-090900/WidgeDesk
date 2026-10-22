@@ -185,23 +185,6 @@ internal sealed class AndroidLiquidGlassRenderer
         TintBackdrop(result, tint, opacity);
     }
 
-    internal static void RenderFrostedBackdropInto(byte[] source, byte[] result, byte[] scratch,
-        int width, int height, Size size, bool dark, double strength, double clarity)
-    {
-        if (source.Length != checked(width * height * 4) || result.Length != source.Length || scratch.Length != source.Length
-            || size.Width <= 0 || size.Height <= 0)
-            throw new ArgumentException("Backdrop buffers must match the complete BGRA frame.");
-        if (ReferenceEquals(source, result) || ReferenceEquals(source, scratch) || ReferenceEquals(result, scratch))
-            throw new ArgumentException("Capture, output and scratch buffers must be distinct.");
-        strength = double.IsFinite(strength) ? Math.Clamp(strength, 0, 1) : 1;
-        clarity = NormalizeBackgroundClarity(clarity);
-        source.CopyTo(result, 0);
-        // Transparency adjusts the veil, while frosted glass always diffuses fine detail.
-        var sigma = (12 + 8 * (1 - clarity)) * (.7 + .3 * strength);
-        Blur(result, width, height, sigma * width / size.Width, sigma * height / size.Height, scratch);
-        TintBackdrop(result, dark ? 24 : 246, .5 * (1 - clarity));
-    }
-
     private static void TintBackdrop(byte[] pixels, double tint, double opacity)
     {
         if (pixels.Length == 0 || opacity == 0) return;
