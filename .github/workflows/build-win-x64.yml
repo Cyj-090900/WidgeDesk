@@ -10,10 +10,10 @@ name: Build packages (win-x64)
 # produced binaries are not CET-marked (Directory.Build.props sets CETCompat=false), so the
 # packages still run on Windows 10.
 #
-# The updater (GlassDesk.AppServices.Updates.UpdateClient) is strict, and this workflow has to
+# The updater (WidgeDesk.AppServices.Updates.UpdateClient) is strict, and this workflow has to
 # satisfy it exactly:
 #   * the release tag must be a plain X.Y.Z version, optionally prefixed with "v";
-#   * the asset must be named GlassDesk-<version>-win-x64-Setup.exe;
+#   * the asset must be named WidgeDesk-<version>-win-x64-Setup.exe;
 #   * the release must win the repository's "latest" query (not a draft or prerelease);
 #   * the asset must carry a sha256 digest, which GitHub computes automatically on upload.
 # A mismatched name or tag makes the app report a malformed update instead of finding one.
@@ -54,18 +54,18 @@ jobs:
         # Pure-logic tests, no desktop access. Informational: a failure stays visible in the log
         # but must not stop the package from being produced.
         continue-on-error: true
-        run: dotnet test tests/GlassDesk.Core.Tests/GlassDesk.Core.Tests.csproj -c Release --nologo
+        run: dotnet test tests/WidgeDesk.Core.Tests/WidgeDesk.Core.Tests.csproj -c Release --nologo
 
       - name: Publish self-contained win-x64
         shell: pwsh
         run: |
-          dotnet publish src/GlassDesk.App/GlassDesk.App.csproj `
+          dotnet publish src/WidgeDesk.App/WidgeDesk.App.csproj `
             -c Release -r win-x64 --self-contained true `
             -p:PublishReadyToRun=true `
             -p:InformationalVersion=${{ steps.version.outputs.version }} `
             -p:IncludeSourceRevisionInInformationalVersion=false `
             -o publish
-          if (-not (Test-Path publish/GlassDesk.exe)) { throw 'GlassDesk.exe was not produced.' }
+          if (-not (Test-Path publish/WidgeDesk.exe)) { throw 'WidgeDesk.exe was not produced.' }
           if (-not (Test-Path publish/update-source.json)) { throw 'update-source.json was not published; the updater would fall back to its compiled-in source.' }
 
       - name: Add licence files
@@ -79,7 +79,7 @@ jobs:
         # A CET-marked image fail-fasts on unpatched Windows 10, which is the whole point of this
         # fork. Fail the build rather than ship a package that cannot start there.
         shell: pwsh
-        run: python tools/check-cet.py publish/GlassDesk.exe
+        run: python tools/check-cet.py publish/WidgeDesk.exe
 
       - name: Install Inno Setup
         id: inno
@@ -111,27 +111,27 @@ jobs:
       - name: Compile installer
         shell: pwsh
         run: |
-          $env:GLASSDESK_PACKAGE_STAGE = (Resolve-Path publish).Path
+          $env:WIDGEDESK_PACKAGE_STAGE = (Resolve-Path publish).Path
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           Push-Location packaging
           try {
             & "${{ steps.inno.outputs.iscc }}" `
-              /DAppIdValue=GlassDesk.Independent `
+              /DAppIdValue=WidgeDesk.Independent `
               "/DProductVersion=${{ steps.version.outputs.version }}" `
               "/DFileVersion=${{ steps.version.outputs.version }}.0" `
-              "/DPackageBaseName=GlassDesk-${{ steps.version.outputs.version }}-win-x64" `
+              "/DPackageBaseName=WidgeDesk-${{ steps.version.outputs.version }}-win-x64" `
               "/O$(Resolve-Path ..\artifacts)" `
-              GlassDesk-Capture.iss
+              WidgeDesk-Capture.iss
             if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE." }
           } finally { Pop-Location }
           Get-ChildItem artifacts | ForEach-Object { Write-Host "  produced: $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)" }
 
       - name: Verify installer name matches what the updater expects
-        # UpdateClient looks for exactly GlassDesk-<version>-win-x64-Setup.exe. Getting this wrong
+        # UpdateClient looks for exactly WidgeDesk-<version>-win-x64-Setup.exe. Getting this wrong
         # is the difference between the updater working and silently reporting "no update".
         shell: pwsh
         run: |
-          $expected = "GlassDesk-${{ steps.version.outputs.version }}-win-x64-Setup.exe"
+          $expected = "WidgeDesk-${{ steps.version.outputs.version }}-win-x64-Setup.exe"
           if (-not (Test-Path "artifacts/$expected")) {
             Get-ChildItem artifacts | ForEach-Object { Write-Host "found: $($_.Name)" }
             throw "Expected installer '$expected' was not produced."
@@ -141,7 +141,7 @@ jobs:
       - name: Package portable zip
         shell: pwsh
         run: |
-          $name = "GlassDesk-${{ steps.version.outputs.version }}-win-x64"
+          $name = "WidgeDesk-${{ steps.version.outputs.version }}-win-x64"
           New-Item -ItemType Directory -Path "stage/$name" -Force | Out-Null
           Copy-Item publish/* "stage/$name" -Recurse -Force
           if (Test-Path "stage/$name/Data") { throw 'The package unexpectedly contains a Data directory.' }
@@ -151,7 +151,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: GlassDesk-${{ steps.version.outputs.version }}-win-x64
+          name: WidgeDesk-${{ steps.version.outputs.version }}-win-x64
           path: artifacts/*
           if-no-files-found: error
 
@@ -176,13 +176,13 @@ jobs:
           $notes = @"
           自包含构建，无需另装 .NET 运行时。
 
-          - ``GlassDesk-$version-win-x64-Setup.exe`` — 安装版，**设置中心的"检查更新"用它**。
-          - ``GlassDesk-$version-win-x64.zip`` — 便携版，解压后双击 GlassDesk.exe 即可运行（不支持自我更新）。
+          - ``WidgeDesk-$version-win-x64-Setup.exe`` — 安装版，**设置中心的"检查更新"用它**。
+          - ``WidgeDesk-$version-win-x64.zip`` — 便携版，解压后双击 WidgeDesk.exe 即可运行（不支持自我更新）。
 
           系统要求：Windows 10 2004（Build 19041）及以上，x64。
 
           源码提交：${{ github.sha }}
           "@
 
-          gh release create $tag artifacts/* --title "GlassDesk $version (win-x64)" --notes $notes
+          gh release create $tag artifacts/* --title "WidgeDesk $version (win-x64)" --notes $notes
           Write-Host "released: $tag"

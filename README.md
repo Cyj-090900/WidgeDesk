@@ -7,9 +7,11 @@ Windows 10 上这些特性按能力探测并自动回退到自绘，功能保持
 
 ## 许可证
 
-原创代码来自 GlassDesk，采用 Apache License 2.0，允许修改、商用及闭源衍生产品，须遵守版权、许可、修改声明等要求。完整条款见 LICENSE；第三方代码与资源保留自身许可，详见 NOTICE 和 docs/third-party。
+原创代码来自 GlassDesk（本项目的上游作者 everlosttime），采用 Apache License 2.0，
+允许修改、商用及闭源衍生产品，须遵守版权、许可、修改声明等要求。
+完整条款见 LICENSE；第三方代码与资源保留自身许可，详见 NOTICE 和 docs/third-party。
 
-GlassDesk 不打包用户导入应用的图标，项目许可不授予第三方商标权利。
+WidgeDesk 不打包用户导入应用的图标，项目许可不授予第三方商标权利。
 
 ## 环境
 
@@ -24,16 +26,16 @@ GlassDesk 不打包用户导入应用的图标，项目许可不授予第三方�
 ## 编译和运行
 
 ```powershell
-dotnet build src/GlassDesk.App/GlassDesk.App.csproj -c Release
-dotnet run --project src/GlassDesk.App/GlassDesk.App.csproj -c Release
+dotnet build src/WidgeDesk.App/WidgeDesk.App.csproj -c Release
+dotnet run --project src/WidgeDesk.App/WidgeDesk.App.csproj -c Release
 ```
 
 程序数据位于实际运行目录旁的 Data。源码构建版也使用独立的输出目录数据。正式版按用户会话维持单实例，启动开发版前应先从托盘退出已安装版。
 
 ```powershell
-dotnet test tests/GlassDesk.Core.Tests/GlassDesk.Core.Tests.csproj -c Release
-dotnet test tests/GlassDesk.AppServices.Tests/GlassDesk.AppServices.Tests.csproj -c Release
-dotnet test tests/GlassDesk.Dock.Tests/GlassDesk.Dock.Tests.csproj -c Release
+dotnet test tests/WidgeDesk.Core.Tests/WidgeDesk.Core.Tests.csproj -c Release
+dotnet test tests/WidgeDesk.AppServices.Tests/WidgeDesk.AppServices.Tests.csproj -c Release
+dotnet test tests/WidgeDesk.Dock.Tests/WidgeDesk.Dock.Tests.csproj -c Release
 ```
 
 部分 Windows/WPF 验收测试会创建窗口并检查真实桌面服务，应在可交互的 Windows 会话中运行。
@@ -43,13 +45,13 @@ dotnet test tests/GlassDesk.Dock.Tests/GlassDesk.Dock.Tests.csproj -c Release
 ```powershell
 $version = ([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.Version
 $version = @($version | Where-Object { $_ })[0]
-dotnet publish src/GlassDesk.App/GlassDesk.App.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true "-p:InformationalVersion=$version" -p:IncludeSourceRevisionInInformationalVersion=false -o artifacts/publish
+dotnet publish src/WidgeDesk.App/WidgeDesk.App.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true "-p:InformationalVersion=$version" -p:IncludeSourceRevisionInInformationalVersion=false -o artifacts/publish
 Copy-Item LICENSE artifacts/publish/LICENSE.txt
 Copy-Item NOTICE artifacts/publish/NOTICE.txt
 Copy-Item docs/third-party artifacts/publish/third-party -Recurse
 ```
 
-artifacts/publish 中的 GlassDesk.exe 可直接运行。不要把自己的 Data 目录放入分发包。框架与第三方资源的许可文件应随分发包保留。
+artifacts/publish 中的 WidgeDesk.exe 可直接运行。不要把自己的 Data 目录放入分发包。框架与第三方资源的许可文件应随分发包保留。
 
 ## 从源码生成安装包
 
@@ -58,21 +60,21 @@ artifacts/publish 中的 GlassDesk.exe 可直接运行。不要把自己的 Data
 PATH。先执行上面的便携版发布命令，再执行：
 
 ```powershell
-$env:GLASSDESK_PACKAGE_STAGE = (Resolve-Path artifacts/publish).Path
-ISCC /DAppIdValue=GlassDesk.Independent "/DProductVersion=$version" "/DFileVersion=$version.0" "/DPackageBaseName=GlassDesk-$version-win-x64" /Oartifacts packaging/GlassDesk-Capture.iss
+$env:WIDGEDESK_PACKAGE_STAGE = (Resolve-Path artifacts/publish).Path
+ISCC /DAppIdValue=WidgeDesk.Independent "/DProductVersion=$version" "/DFileVersion=$version.0" "/DPackageBaseName=WidgeDesk-$version-win-x64" /Oartifacts packaging/WidgeDesk-Capture.iss
 ```
 
 安装包支持选择目录。安装更新保留设置、应用库、布局和图标缓存，卸载也保留 Data。此源码打包流程不要求私有仓库的旧安装载荷。
 
-产出的安装包名为 `GlassDesk-<版本>-win-x64-Setup.exe`。**这个文件名不能改**：设置中心的
+产出的安装包名为 `WidgeDesk-<版本>-win-x64-Setup.exe`。**这个文件名不能改**：设置中心的
 「检查更新」按这个规则在本仓库的 Releases 中查找资产（见 `UpdateClient`），改名会导致
 更新器报告「更新信息无效」。Release 标签也必须是纯版本号（如 `v1.3.1`）。
 
 ## 修改着色器
 
-TransitionGlass.hlsl 和编译后的 TransitionGlass.ps 均在 src/GlassDesk.UI/Effects 中。修改 HLSL 后执行 build/compile-transition-shader.ps1，再重新编译。
+TransitionGlass.hlsl 和编译后的 TransitionGlass.ps 均在 src/WidgeDesk.UI/Effects 中。修改 HLSL 后执行 build/compile-transition-shader.ps1，再重新编译。
 
-历史 GlassDesk.UiAcceptance 工程的目标框架低于正式项目，直接构建整个旧解决方案会报 NU1201。请按上述 App 项目构建；此问题不影响正式程序的源码构建。本次保留历史测试源码，未改写历史产品代码。
+历史 WidgeDesk.UiAcceptance 工程的目标框架低于正式项目，直接构建整个旧解决方案会报 NU1201。请按上述 App 项目构建；此问题不影响正式程序的源码构建。本次保留历史测试源码，未改写历史产品代码。
 
 ## Windows 10 说明
 
@@ -113,7 +115,7 @@ KB5044273 发布（`ntdll` 10.0.19041.5007）；早于它的机器只要镜像�
    （类型 20，`IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS`）第 0 位清掉，再让构建指向副本：
 
    ```powershell
-   dotnet build src/GlassDesk.App/GlassDesk.App.csproj -c Release `
+   dotnet build src/WidgeDesk.App/WidgeDesk.App.csproj -c Release `
      -m:1 -nodeReuse:false -p:UseSharedCompilation=false `
      -p:CscToolPath=<补丁后的 Roslyn 副本路径> -p:CscToolExe=csc.exe
    ```

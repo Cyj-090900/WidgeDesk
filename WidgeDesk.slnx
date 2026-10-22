@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WidgeDesk.App/WidgeDesk.App.csproj" />
+    <Project Path="src/WidgeDesk.AppServices/WidgeDesk.AppServices.csproj" />
+    <Project Path="src/WidgeDesk.Core/WidgeDesk.Core.csproj" />
+    <Project Path="src/WidgeDesk.Dock/WidgeDesk.Dock.csproj" />
+    <Project Path="src/WidgeDesk.Launcher/WidgeDesk.Launcher.csproj" />
+    <Project Path="src/WidgeDesk.Platform/WidgeDesk.Platform.csproj" />
+    <Project Path="src/WidgeDesk.Settings/WidgeDesk.Settings.csproj" />
+    <Project Path="src/WidgeDesk.UI/WidgeDesk.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WidgeDesk.Core.Tests/WidgeDesk.Core.Tests.csproj" />
+    <Project Path="tests/WidgeDesk.AppServices.Tests/WidgeDesk.AppServices.Tests.csproj" />
+    <Project Path="tests/WidgeDesk.InstanceProbe/WidgeDesk.InstanceProbe.csproj" />
+    <Project Path="tests/WidgeDesk.Dock.Tests/WidgeDesk.Dock.Tests.csproj" />
+    <Project Path="tests/WidgeDesk.UiAcceptance/WidgeDesk.UiAcceptance.csproj" />
+    <Project Path="tests/WidgeDesk.LauncherAcceptance/WidgeDesk.LauncherAcceptance.csproj" />
+    <Project Path="tests/WidgeDesk.InteractionAcceptance/WidgeDesk.InteractionAcceptance.csproj" />
+    <Project Path="tests/WidgeDesk.DesktopAcceptance/WidgeDesk.DesktopAcceptance.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Dock bar. Phase 1 ships the window shell only; the icon bar, magnification and pinning
+    arrive in phase 4. The AppServices reference is how the dock reaches the shared
+    application library (through AppServiceHost) — it must never reference WidgeDesk.App.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RootNamespace>WidgeDesk.Dock</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WidgeDesk.AppServices\WidgeDesk.AppServices.csproj" />
+    <ProjectReference Include="..\WidgeDesk.Core\WidgeDesk.Core.csproj" />
+    <ProjectReference Include="..\WidgeDesk.UI\WidgeDesk.UI.csproj" />
+  </ItemGroup>
+
+</Project>
