@@ -60,6 +60,9 @@ public sealed class DockTileModel : INotifyPropertyChanged
     /// </remarks>
     public IReadOnlyList<nint> Windows { get; init; } = [];
 
+    /// <summary>与 <see cref="Windows"/> 一一对应的标题，供多窗口选择列表使用。</summary>
+    public IReadOnlyList<string> WindowTitles { get; init; } = [];
+
     /// <summary>内置入口的符号字形（Segoe Fluent Icons）。普通磁贴为 null（用图标）。</summary>
     public string? Glyph { get; init; }
 

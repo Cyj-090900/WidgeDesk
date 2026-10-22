@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using System.Diagnostics;
 using GlassDesk.AppServices;
 using GlassDesk.Core.Models;
 using GlassDesk.Core.Storage;
@@ -180,6 +181,83 @@ public sealed class DockAutoTileTests
 
                 Assert.Empty(AutoTiles(window));
             });
+        });
+    }
+
+    /// <summary>
+    /// 对<strong>真实运行的进程</strong>点一次自动磁贴，把它的窗口提到前面，
+    /// 而不是再启动一个。
+    /// </summary>
+    /// <remarks>
+    /// <b>这一条对应一个真实上报的缺陷。</b>应用已经开着，在 Dock 上再点一次却多开一个。
+    /// 前面的假句柄测试证明不了这件事——假句柄一律「已失效」，走的永远是兜底分支。
+    /// 只有真的起一个带窗口的进程，才能验证「有窗口就前置、绝不启动」。
+    /// </remarks>
+    [Fact]
+    public void 点已运行的自动磁贴只前置不重复启动()
+    {
+        StaTest.Run(() =>
+        {
+            // 记事本是最合适的靶子：每次启动都开一个独立的新窗口，
+            // 因此「多开」这件事一旦发生就是可数的。
+            var notepad = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                "System32", "notepad.exe");
+
+            if (!File.Exists(notepad))
+            {
+                return; // 没有靶子的精简系统上跳过，而不是让整轮失败。
+            }
+
+            var before = GlassDesk.Platform.Shell.WindowLocator.FindWindowsForImage(notepad).Count;
+            Process? process = null;
+            try
+            {
+                process = Process.Start(new ProcessStartInfo(notepad) { UseShellExecute = true });
+                Assert.NotNull(process);
+
+                // 等窗口出现；记事本冷启动有时要一秒多。
+                var deadline = DateTime.UtcNow.AddSeconds(15);
+                while (GlassDesk.Platform.Shell.WindowLocator.FindWindowsForImage(notepad).Count <= before)
+                {
+                    Assert.True(DateTime.UtcNow < deadline, "记事本窗口没有出现");
+                    Thread.Sleep(100);
+                }
+
+                var countAfterLaunch = GlassDesk.Platform.Shell.WindowLocator.FindWindowsForImage(notepad).Count;
+
+                WithDock((window, host, data) =>
+                {
+                    host.Running.Reconcile();
+                    window.RefreshTiles();
+
+                    var auto = AutoTiles(window).FirstOrDefault(tile =>
+                        string.Equals(tile.LaunchTarget, notepad, StringComparison.OrdinalIgnoreCase));
+
+                    Assert.NotNull(auto);
+                    Assert.NotEmpty(auto.Windows);
+
+                    // 真正点一次。它会前置已有窗口；绝不能启动第二个。
+                    var activate = typeof(DockWindow).GetMethod("ActivateAutoTile",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                    activate.Invoke(window, [auto.EntryId]);
+
+                    Thread.Sleep(700);
+
+                    var countAfterClick = GlassDesk.Platform.Shell.WindowLocator.FindWindowsForImage(notepad).Count;
+                    Assert.True(countAfterClick <= countAfterLaunch,
+                        $"点一次之后多出了窗口：{countAfterLaunch} -> {countAfterClick}");
+                });
+            }
+            finally
+            {
+                try
+                {
+                    if (process is { HasExited: false }) process.Kill();
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+                process?.Dispose();
+            }
         });
     }
 

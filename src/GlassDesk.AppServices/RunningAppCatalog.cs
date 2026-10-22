@@ -24,6 +24,10 @@ namespace GlassDesk.AppServices;
 /// 单实例应用会把自己已有窗口提到前面，而不是再开一个。
 /// </param>
 /// <param name="Windows">此刻属于这个应用的全部候选顶层窗口，供「退出程序」使用。</param>
+/// <param name="WindowTitles">
+/// 与 <paramref name="Windows"/> 一一对应的窗口标题，供多窗口选择列表使用。
+/// 与任务栏一致：点一个有多个窗口的应用时先让用户选是哪个。
+/// </param>
 public sealed record RunningApp(
     string Id,
     string DisplayName,
@@ -32,7 +36,8 @@ public sealed record RunningApp(
     string IconSource,
     string? CustomIconPath,
     string? EntryId,
-    IReadOnlyList<nint> Windows);
+    IReadOnlyList<nint> Windows,
+    IReadOnlyList<string> WindowTitles);
 
 /// <summary>
 /// 把一次窗口快照归纳成「哪些应用正在运行」。
@@ -57,6 +62,41 @@ public static class RunningAppCatalog
     /// <summary>这个 id 是不是自动磁贴。</summary>
     public static bool IsAutoTile(string? itemId)
         => itemId is not null && itemId.StartsWith(AutoTilePrefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// 点击一枚自动磁贴时该做什么。
+    /// </summary>
+    /// <remarks>
+    /// 抽成纯枚举而不是把 if 写在窗口里，是因为「绝不能重复启动」这条规则
+    /// 要能被测试直接断言——它正是「点一次多开一个」那个缺陷的落点。
+    /// </remarks>
+    public enum Activation
+    {
+        /// <summary>只有一个窗口：把它提到前面。</summary>
+        Raise = 0,
+
+        /// <summary>有多个窗口：先让用户选是哪一个（与任务栏点分组图标一致）。</summary>
+        Choose = 1,
+
+        /// <summary>一个可用窗口都没有：这才轮到启动。</summary>
+        Launch = 2,
+    }
+
+    /// <summary>
+    /// 给定「还剩几个可用窗口」，决定点击该做什么。
+    /// </summary>
+    /// <remarks>
+    /// <b>只要还有窗口，就绝不返回 <see cref="Activation.Launch"/>。</b>
+    /// 自动磁贴正是因为「这个应用有窗口」才存在，点它时再去启动，等于要求应用
+    /// 自己判断「我已经开着了吗」——多数程序不做这个判断，于是多开一个。
+    /// </remarks>
+    public static Activation DecideActivation(int availableWindows)
+        => availableWindows switch
+        {
+            <= 0 => Activation.Launch,
+            1 => Activation.Raise,
+            _ => Activation.Choose,
+        };
 
     /// <summary>
     /// 归纳出此刻正在运行、且还没有被固定到 Dock 的应用。
@@ -113,7 +153,7 @@ public static class RunningAppCatalog
                 order.Add(key);
             }
 
-            group.Windows.Add(window.Handle);
+            group.Windows.Add(window);
         }
 
         var result = new List<RunningApp>();
@@ -145,7 +185,8 @@ public static class RunningAppCatalog
                 entry?.IconSource ?? group.IconSource,
                 entry?.CustomIconPath,
                 entry?.Id,
-                group.Windows));
+                [.. group.Windows.Select(window => window.Handle)],
+                [.. group.Windows.Select(window => window.Title)]));
         }
 
         return result;
@@ -239,6 +280,6 @@ public static class RunningAppCatalog
 
         public string IconSource => ImagePath ?? Aumid ?? string.Empty;
 
-        public List<nint> Windows { get; } = [];
+        public List<WindowIdentityInfo> Windows { get; } = [];
     }
 }

@@ -514,6 +514,7 @@ public partial class DockWindow : GlassWindow
             AutoIconSource = running.IconSource,
             AutoCustomIconPath = running.CustomIconPath,
             Windows = running.Windows,
+            WindowTitles = running.WindowTitles,
             DisplayName = running.DisplayName,
             ToolTipText = running.DisplayName,
             Icon = LoadAutoTileIcon(running),
@@ -737,7 +738,9 @@ public partial class DockWindow : GlassWindow
             return;
         }
 
-        var outcome = _services.Launch.ActivateOrLaunch(entryId);
+        // 用调和快照而不是现场枚举：状态点依据的就是这份快照，
+        // 点击再枚举一次会让「图标亮着却新开一个」成为可能。
+        var outcome = _services.Launch.ActivateOrLaunch(entryId, _services.Running.LastWindows);
 
         switch (outcome.Outcome)
         {
@@ -755,7 +758,21 @@ public partial class DockWindow : GlassWindow
         }
     }
 
-    /// <summary>激活一枚自动磁贴：已有库条目就激活它，否则按目标启动。</summary>
+    /// <summary>
+    /// 激活一枚自动磁贴：把它**已经存在的窗口**提到前面，绝不重新启动。
+    /// </summary>
+    /// <remarks>
+    /// <b>这是「与任务栏一致」的核心。</b>自动磁贴只因为「这个应用此刻有窗口」才存在，
+    /// 所以点它的时候窗口一定就在那里——再去调一次启动，等于要求应用自己判断
+    /// 「我已经开着了吗」，而多数程序不做这个判断，于是多开一个。
+    /// 之前正是这么写的，表现为「点一次多一个」。
+    ///
+    /// <para>
+    /// 只有一个窗口就前置它；有多个则让用户选——这与任务栏点分组图标的行为一致。
+    /// 只有在磁贴记录下来的窗口全部失效（应用刚退出、状态还没调和）时才回退到启动，
+    /// 那是一种竞态兜底，而不是常规路径。
+    /// </para>
+    /// </remarks>
     private void ActivateAutoTile(string autoId)
     {
         if (_services is null)
@@ -770,6 +787,23 @@ public partial class DockWindow : GlassWindow
             return;
         }
 
+        // 先按磁贴记下的句柄激活。这些句柄就是状态点所依据的那批窗口，
+        // 因此「有点就是有窗口」这件事在这里必然成立。
+        var alive = model.Windows.Where(WindowControl.IsAlive).ToList();
+
+        switch (RunningAppCatalog.DecideActivation(alive.Count))
+        {
+            case RunningAppCatalog.Activation.Raise:
+                ActivateWindowOrReport(alive[0], model.DisplayName);
+                return;
+
+            case RunningAppCatalog.Activation.Choose:
+                ShowWindowChooser(CandidatesFrom(model, alive));
+                return;
+        }
+
+        // 到这里说明窗口已在调和之前关掉了。库条目存在时走它（会重新匹配/启动），
+        // 否则按目标启动——此时确实没有可前置的窗口。
         if (model.LaunchEntryId is { } entryId && _services.Library.Find(entryId) is not null)
         {
             OnTileClicked(this, entryId);
@@ -786,6 +820,42 @@ public partial class DockWindow : GlassWindow
         if (!opened.Started)
         {
             ShowFailureNotice($"{model.DisplayName} 未能打开。");
+        }
+    }
+
+    /// <summary>把磁贴记下的存活窗口换算成选择列表的候选。</summary>
+    private static List<WindowCandidate> CandidatesFrom(DockTileModel model, List<nint> alive)
+    {
+        var candidates = new List<WindowCandidate>(alive.Count);
+
+        foreach (var handle in alive)
+        {
+            var index = IndexOf(model.Windows, handle);
+            var title = index >= 0 && index < model.WindowTitles.Count ? model.WindowTitles[index] : string.Empty;
+            candidates.Add(new WindowCandidate { Handle = handle, Title = title });
+        }
+
+        return candidates;
+    }
+
+    private static int IndexOf(IReadOnlyList<nint> handles, nint handle)
+    {
+        for (var index = 0; index < handles.Count; index++)
+        {
+            if (handles[index] == handle) return index;
+        }
+
+        return -1;
+    }
+
+    /// <summary>前置一个窗口；失败时如实说明，而不是偷偷再启动一个。</summary>
+    private void ActivateWindowOrReport(nint handle, string displayName)
+    {
+        var outcome = LaunchService.ActivateWindow(handle);
+
+        if (outcome.Outcome != ActivationOutcome.Activated)
+        {
+            ShowFailureNotice(outcome.Message ?? $"{displayName} 的窗口没能切到前台。");
         }
     }
 

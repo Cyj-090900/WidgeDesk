@@ -73,6 +73,21 @@ public sealed class LaunchService : ILaunchService
     /// 都不适用时老实启动——退化行为见 <see cref="WindowMatcher"/> 的说明。
     /// </remarks>
     public ActivationResult ActivateOrLaunch(string itemId)
+        => ActivateOrLaunch(itemId, null);
+
+    /// <summary>
+    /// 同上，但用调用方给定的窗口快照代替现场枚举。
+    /// </summary>
+    /// <param name="snapshot">
+    /// 窗口快照；为 null 时现场枚举。
+    /// </param>
+    /// <remarks>
+    /// <b>为什么允许传快照。</b>Dock 的状态点依据的是调和快照（<see cref="RunningAppTracker"/>），
+    /// 而点击若另行枚举一次，两次结果可能对不上——典型表现是「图标亮着状态点、
+    /// 点它却新开一个」，因为那一刻的现场枚举恰好没匹配到。用同一份快照，
+    /// 「看到什么就点什么」在结构上成立。
+    /// </remarks>
+    public ActivationResult ActivateOrLaunch(string itemId, IReadOnlyList<WindowIdentityInfo>? snapshot)
     {
         var entry = _library.Find(itemId);
 
@@ -115,7 +130,9 @@ public sealed class LaunchService : ILaunchService
                 : new ActivationResult { Outcome = ActivationOutcome.Failed, Message = plain.Message };
         }
 
-        var windows = WindowMatcher.FindWindows(entry);
+        var windows = snapshot is null
+            ? WindowMatcher.FindWindows(entry)
+            : WindowMatcher.MatchWindows(entry, snapshot, WindowMatcher.ResolveAumid(entry));
 
         switch (windows.Count)
         {
@@ -132,6 +149,27 @@ public sealed class LaunchService : ILaunchService
                 };
 
             default:
+                // 快照里没匹配到，不等于现场真的没有——快照可能比现场旧。
+                // 启动之前再按现场确认一次：宁可多枚举一遍，也不能凭空多开一个
+                // （那正是「点一次多一个」的成因）。快照与现场一致时这里不会触发。
+                if (snapshot is not null)
+                {
+                    var fresh = WindowMatcher.FindWindows(entry);
+
+                    if (fresh.Count > 0)
+                    {
+                        return fresh.Count == 1
+                            ? Raise(new WindowCandidateInfo(fresh[0].Handle, fresh[0].Title, fresh[0].ProcessId, fresh[0].IsMinimized))
+                            : new ActivationResult
+                            {
+                                Outcome = ActivationOutcome.MultipleWindowsFound,
+                                Candidates = fresh
+                                    .Select(window => new WindowCandidate { Handle = window.Handle, Title = window.Title })
+                                    .ToList(),
+                            };
+                    }
+                }
+
                 var launched = OpenWithShell(entry);
 
                 return launched.Succeeded
