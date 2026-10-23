@@ -60,10 +60,10 @@ public sealed class WidgeDeskSettings
             ? Math.Clamp(Dock.SizeScale, DockSettings.MinimumSizeScale, DockSettings.MaximumSizeScale) : 1;
         // Settings now owns its opaque surface instead of changing every window.
         Appearance.ReduceTransparency = false;
-        Appearance.DockGlassTransparency = double.IsFinite(Appearance.DockGlassTransparency)
-            ? Math.Clamp(Appearance.DockGlassTransparency, 0, 1) : AppearanceSettings.DefaultDockGlassTransparency;
-        Appearance.LauncherGlassTransparency = double.IsFinite(Appearance.LauncherGlassTransparency)
-            ? Math.Clamp(Appearance.LauncherGlassTransparency, 0, 1) : AppearanceSettings.DefaultLauncherGlassTransparency;
+        // 玻璃透明度不再开放设置：固定回内置默认值。
+        // 旧文件里的自定义数值会被忽略，这样界面、代码与文档说的是同一件事。
+        Appearance.DockGlassTransparency = AppearanceSettings.DefaultDockGlassTransparency;
+        Appearance.LauncherGlassTransparency = AppearanceSettings.DefaultLauncherGlassTransparency;
         Appearance.GlassTintOpacity = double.IsFinite(Appearance.GlassTintOpacity)
             ? Math.Clamp(Appearance.GlassTintOpacity, 0, 1) : AppearanceSettings.DefaultGlassTintOpacity;
         Appearance.GlassBackgroundClarity = double.IsFinite(Appearance.GlassBackgroundClarity)

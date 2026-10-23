@@ -42,18 +42,14 @@ public sealed class GlassMaterialSelectionTests
                 Assert.Null(window.FindName("GlassDebugViewCombo"));
                 Assert.Null(window.FindName("GlassPerformanceOverlayCheck"));
                 Assert.Null(window.FindName("GlassFaceScaleSlider"));
-                var dockTransparency = Assert.IsType<Slider>(window.FindName("DockTransparencySlider"));
-                var launcherTransparency = Assert.IsType<Slider>(window.FindName("LauncherTransparencySlider"));
-                Assert.Equal(.9, dockTransparency.Value);
-                Assert.Equal(.2, launcherTransparency.Value);
-                dockTransparency.Value = .8;
+                // 透明度不再出现在页面上，也没有可用控件。
+                Assert.Null(window.FindName("DockTransparencySlider"));
+                Assert.Null(window.FindName("LauncherTransparencySlider"));
+                Assert.Equal(.9, theme.Appearance.DockGlassTransparency);
                 Assert.Equal(.2, theme.Appearance.LauncherGlassTransparency);
-                launcherTransparency.Value = .3;
                 Assert.IsType<CheckBox>(window.FindName("ReduceMotionCheck")).IsChecked = true;
                 Assert.True(theme.IsDark);
                 Assert.Equal(GlassMaterialMode.AndroidLiquidGlass, theme.Appearance.GlassMaterial);
-                Assert.Equal(.8, theme.Appearance.DockGlassTransparency);
-                Assert.Equal(.3, theme.Appearance.LauncherGlassTransparency);
                 Assert.True(theme.Appearance.ReduceMotion);
                 Assert.Equal(GlassSurfaceMode.SelfDrawn, window.SurfaceMode);
                 Assert.Equal(255, Assert.IsType<SolidColorBrush>(window.PanelBackgroundBrush).Color.A);
@@ -61,8 +57,8 @@ public sealed class GlassMaterialSelectionTests
                 reloaded.LoadAll();
                 Assert.Equal(ThemeMode.Dark, reloaded.Settings.Current.Appearance.Theme);
                 Assert.Equal(GlassMaterialMode.AndroidLiquidGlass, reloaded.Settings.Current.Appearance.GlassMaterial);
-                Assert.Equal(.8, reloaded.Settings.Current.Appearance.DockGlassTransparency);
-                Assert.Equal(.3, reloaded.Settings.Current.Appearance.LauncherGlassTransparency);
+                Assert.Equal(.9, reloaded.Settings.Current.Appearance.DockGlassTransparency);
+                Assert.Equal(.2, reloaded.Settings.Current.Appearance.LauncherGlassTransparency);
                 Assert.True(reloaded.Settings.Current.Appearance.ReduceMotion);
                 Assert.False(new LiquidGlassSurface().IsHitTestVisible);
             }

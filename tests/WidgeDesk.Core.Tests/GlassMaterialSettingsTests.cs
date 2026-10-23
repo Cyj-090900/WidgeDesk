@@ -7,23 +7,25 @@ namespace WidgeDesk.Core.Tests;
 public sealed class GlassMaterialSettingsTests
 {
     [Fact]
-    public void DockAndLauncherTransparencyHaveIndependentDefaultsPersistenceAndReset()
+    public void DockAndLauncherTransparencyAlwaysUseTheBuiltInDefaults()
     {
         using var temp = new TempDataDirectory();
         var store = new SettingsStore(temp.Paths.SettingsFile);
         store.Load();
         Assert.Equal(.9, store.Current.Appearance.DockGlassTransparency);
         Assert.Equal(.2, store.Current.Appearance.LauncherGlassTransparency);
+        // 透明度已不开放设置：写入自定义值后，加载时必须回到内置默认，
+        // 否则界面上看不见的数值仍会影响外观。
         store.Current.Appearance.DockGlassTransparency = .65;
         store.Save();
         store.Load();
-        Assert.Equal(.65, store.Current.Appearance.DockGlassTransparency);
+        Assert.Equal(.9, store.Current.Appearance.DockGlassTransparency);
         Assert.Equal(.2, store.Current.Appearance.LauncherGlassTransparency);
         store.Current.Appearance.LauncherGlassTransparency = .35;
         store.Save();
         store.Load();
-        Assert.Equal(.65, store.Current.Appearance.DockGlassTransparency);
-        Assert.Equal(.35, store.Current.Appearance.LauncherGlassTransparency);
+        Assert.Equal(.9, store.Current.Appearance.DockGlassTransparency);
+        Assert.Equal(.2, store.Current.Appearance.LauncherGlassTransparency);
         var reset = SettingsPageEditor.ResetPage(store.Current, "外观");
         Assert.Equal(.9, reset.Appearance.DockGlassTransparency);
         Assert.Equal(.2, reset.Appearance.LauncherGlassTransparency);

@@ -239,7 +239,7 @@ internal static class Program
             settings.Show();
             Pump(TimeSpan.FromMilliseconds(100));
             VerifySettingsNavigation(settings, data, paths);
-            VerifyGlassTransparency(settings, data, paths, Path.Combine(Path.GetDirectoryName(settingsScreenshot)!, "glass-transparency.png"));
+            VerifyGlassTransparencyIsFixed(settings, data, Path.Combine(Path.GetDirectoryName(settingsScreenshot)!, "glass-transparency.png"));
             var previousPointerSetting = data.Settings.Current.Display.LauncherFollowsPointer;
             RecordShortcut(settings, "ToggleLauncherHotkeyBox", Key.F13, ModifierKeys.Control);
             Check("快捷操作录制自动保存且保留旧显示器设置", data.Settings.Current.Display.LauncherFollowsPointer == previousPointerSetting
@@ -491,50 +491,17 @@ internal static class Program
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessage(nint hwnd, int message, nint wParam, nint lParam);
 
-    private static void VerifyGlassTransparency(SettingsWindow settings, WidgeDeskDataStore data, AppPaths paths, string screenshot)
+    private static void VerifyGlassTransparencyIsFixed(SettingsWindow settings, WidgeDeskDataStore data, string screenshot)
     {
-        var sampling = WidgeDesk.UI.Controls.LiquidGlassDebugState.SamplingParameters;
-        var weights = WidgeDesk.UI.Controls.LiquidGlassDebugState.WeightParameters;
-        var brdf = WidgeDesk.UI.Controls.LiquidGlassDebugState.BrdfParameters;
-        var dispersion = WidgeDesk.UI.Controls.LiquidGlassDebugState.DispersionParameters;
-        foreach (var (controlName, launcher) in new[] { ("DockTransparencySlider", false), ("LauncherTransparencySlider", true) })
-        {
-            double Read(WidgeDesk.Core.Models.Settings.AppearanceSettings appearance) => launcher
-                ? appearance.LauncherGlassTransparency : appearance.DockGlassTransparency;
-            double ReadOther(WidgeDesk.Core.Models.Settings.AppearanceSettings appearance) => launcher
-                ? appearance.DockGlassTransparency : appearance.LauncherGlassTransparency;
-            var otherBefore = ReadOther(data.Settings.Current.Appearance);
-            var slider = (Slider)settings.FindName(controlName)!;
-            foreach (var transparency in new[] { 1d, 0d, .5 })
-            {
-                slider.Value = transparency;
-                Pump(TimeSpan.FromMilliseconds(100));
-                var expected = transparency;
-                Check($"玻璃透明度{transparency:P0}实时应用并保存",
-                    Math.Abs(Read(data.Settings.Current.Appearance) - expected) < 1e-9
-                    && Math.Abs(Read(ThemeService.Current!.Appearance) - expected) < 1e-9
-                    && Math.Abs(Read(Reload(paths).Settings.Current.Appearance) - expected) < 1e-9
-                    && ReadOther(data.Settings.Current.Appearance) == otherBefore
-                    && settings.Opacity == 1,
-                    "两窗口透明度独立保存，窗口Opacity保持1", $"control={controlName}; transparency={Read(data.Settings.Current.Appearance)}; opacity={settings.Opacity}");
-            }
-            Check("透明度滑块保留Face Inner Outer与光学参数",
-                sampling == WidgeDesk.UI.Controls.LiquidGlassDebugState.SamplingParameters
-                && weights == WidgeDesk.UI.Controls.LiquidGlassDebugState.WeightParameters
-                && brdf == WidgeDesk.UI.Controls.LiquidGlassDebugState.BrdfParameters
-                && dispersion == WidgeDesk.UI.Controls.LiquidGlassDebugState.DispersionParameters,
-                "采样、权重、高光和色散保持原值", "已比较滑块调节前后参数");
-            var before = File.ReadAllBytes(paths.SettingsFile);
-            var previousClarity = Read(data.Settings.Current.Appearance);
-            using (var locked = new FileStream(paths.SettingsFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                slider.Value = .75;
-            Check("透明度保存失败时恢复滑块与实时预览",
-                Read(data.Settings.Current.Appearance) == previousClarity
-                && Read(ThemeService.Current!.Appearance) == previousClarity
-                && Math.Abs(slider.Value - previousClarity) < 1e-9
-                && before.SequenceEqual(File.ReadAllBytes(paths.SettingsFile)),
-                "设置、预览、滑块和磁盘均恢复原值", $"stored={Read(data.Settings.Current.Appearance)}; live={Read(ThemeService.Current!.Appearance)}");
-        }
+        // 透明度已固定为内置默认：页面上不应再有滑块，配置里也不再受自定义值影响。
+        Check("外观页不再提供透明度滑块",
+            settings.FindName("DockTransparencySlider") is null && settings.FindName("LauncherTransparencySlider") is null,
+            "no transparency controls", "removed");
+        Check("玻璃透明度固定为内置默认",
+            Math.Abs(data.Settings.Current.Appearance.DockGlassTransparency - .9) < 1e-9
+            && Math.Abs(data.Settings.Current.Appearance.LauncherGlassTransparency - .2) < 1e-9,
+            "Dock .9 / Launcher .2",
+            $"dock={data.Settings.Current.Appearance.DockGlassTransparency}; launcher={data.Settings.Current.Appearance.LauncherGlassTransparency}");
         ((ListBox)settings.FindName("SettingsPageList")!).SelectedIndex = 0;
         Pump(TimeSpan.FromMilliseconds(200));
         Capture(settings, screenshot);

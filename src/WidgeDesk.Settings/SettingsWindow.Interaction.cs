@@ -92,10 +92,6 @@ public partial class SettingsWindow
         try
         {
             var appearance = _dataStore.Settings.Current.Appearance;
-            DockTransparencySlider.Value = appearance.DockGlassTransparency;
-            LauncherTransparencySlider.Value = appearance.LauncherGlassTransparency;
-            DockTransparencyValue.Text = appearance.DockGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
-            LauncherTransparencyValue.Text = appearance.LauncherGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
             CustomBackgroundCheck.IsChecked = appearance.UseCustomBackground;
             CustomBackgroundColorBox.Text = appearance.CustomBackgroundColor;
             CustomBackgroundOpacitySlider.Value = appearance.CustomBackgroundOpacity;
@@ -105,7 +101,7 @@ public partial class SettingsWindow
             ReduceMotionCheck.IsChecked = appearance.ReduceMotion;
             AppearanceStatus.Text = appearance.UseCustomBackground
                 ? "设置面板固定使用深色不透明背景；Dock 与启动台使用自定义背景色。"
-                : "设置面板固定使用深色不透明背景；玻璃透明度应用到 Dock 和启动台。";
+                : "设置面板固定使用深色不透明背景；Dock 与启动台使用液态玻璃。";
         }
         finally { _loadingAppearanceControls = false; }
     }
@@ -161,24 +157,6 @@ public partial class SettingsWindow
         SavePageSnapshot(snapshot, "外观", AppearanceStatus);
         if (ThemeService.Current is { } theme && !ReferenceEquals(theme.Appearance, current.Appearance))
             theme.Update(current.Appearance);
-    }
-
-    private void OnGlassTransparencyChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_loadingAppearanceControls || !IsInitialized || _dataStore is null) return;
-        var current = _dataStore.Settings.Current;
-        var snapshot = SettingsPageEditor.Clone(current);
-        if (ReferenceEquals(sender, DockTransparencySlider))
-            current.Appearance.DockGlassTransparency = DockTransparencySlider.Value;
-        else if (ReferenceEquals(sender, LauncherTransparencySlider))
-            current.Appearance.LauncherGlassTransparency = LauncherTransparencySlider.Value;
-        else return;
-        SavePageSnapshot(snapshot, "外观", AppearanceStatus);
-        // Rollback replaces Appearance; refresh the preview's reference after a failed save.
-        if (ThemeService.Current is { } theme && !ReferenceEquals(theme.Appearance, current.Appearance))
-            theme.Update(current.Appearance);
-        DockTransparencyValue.Text = current.Appearance.DockGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
-        LauncherTransparencyValue.Text = current.Appearance.LauncherGlassTransparency.ToString("P0", CultureInfo.CurrentCulture);
     }
 
     private void LoadInteractionControls()

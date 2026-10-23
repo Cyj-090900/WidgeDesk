@@ -165,33 +165,11 @@
             <StackPanel>
               <TextBlock x:Name="AppearanceSectionHeading" FontSize="16" FontWeight="SemiBold" Text="外观"
                          Foreground="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
-              <TextBlock Margin="0,12,0,4" Text="玻璃效果" />
-              <TextBlock Margin="0,0,0,4" TextWrapping="Wrap"
-                         Text="液态玻璃保留折射与边缘光泽，同时应用到 Dock 和启动台。" />
-              <TextBlock Margin="0,12,0,4" Text="Dock 透明度" />
-              <DockPanel>
-                <TextBlock x:Name="DockTransparencyValue" DockPanel.Dock="Right" Width="48" TextAlignment="Right" />
-                <Slider x:Name="DockTransparencySlider" Minimum="0" Maximum="1" Value="0.9"
-                        SmallChange="0.01" LargeChange="0.1" IsMoveToPointEnabled="True"
-                        AutomationProperties.Name="Dock 透明度" ValueChanged="OnGlassTransparencyChanged" />
-              </DockPanel>
-              <DockPanel Margin="0,4,0,0">
-                <TextBlock DockPanel.Dock="Left" Text="不透明" />
-                <TextBlock Text="透明" TextAlignment="Right" />
-              </DockPanel>
-              <TextBlock Margin="0,12,0,4" Text="启动台透明度" />
-              <DockPanel>
-                <TextBlock x:Name="LauncherTransparencyValue" DockPanel.Dock="Right" Width="48" TextAlignment="Right" />
-                <Slider x:Name="LauncherTransparencySlider" Minimum="0" Maximum="1" Value="0.2"
-                        SmallChange="0.01" LargeChange="0.1" IsMoveToPointEnabled="True"
-                        AutomationProperties.Name="启动台透明度" ValueChanged="OnGlassTransparencyChanged" />
-              </DockPanel>
-              <DockPanel Margin="0,4,0,0">
-                <TextBlock DockPanel.Dock="Left" Text="不透明" />
-                <TextBlock Text="透明" TextAlignment="Right" />
-              </DockPanel>
-              <TextBlock Margin="0,6,0,0" Text="分别调节 Dock 和启动台的玻璃透明度。默认 Dock 90%、启动台 20%。" TextWrapping="Wrap" />
-              <CheckBox x:Name="CustomBackgroundCheck" Margin="0,14,0,0" Content="使用自定义背景色"
+              <!--
+                玻璃材质与透明度不再提供设置项：产品固定使用液态玻璃与内置默认透明度。
+                设置文件里的相关字段仍会读取，旧用户的外观不会因为这次简化而改变。
+              -->
+              <CheckBox x:Name="CustomBackgroundCheck" Margin="0,12,0,0" Content="使用自定义背景色"
                         AutomationProperties.Name="使用自定义背景色"
                         Checked="OnAppearanceControlChanged" Unchecked="OnAppearanceControlChanged" />
               <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
