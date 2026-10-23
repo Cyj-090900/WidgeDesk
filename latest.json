@@ -1,9 +1,9 @@
 {
-  "version": "5.3.1",
-  "fileName": "WidgeDesk-5.3.1-win-x64-Setup.exe",
-  "size": 60722811,
-  "sha256": "a51efd8ec2fb0ff53c61cfe66a28fd578c3fa40879a95db3126fcd3140660da3",
-  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.3.1/WidgeDesk-5.3.1-win-x64-Setup.exe",
-  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.3.1",
-  "notes": "# WidgeDesk 5.3.1\n\n## 外观页再简化：玻璃效果与透明度设为固定值\n\n「外观」页原来还有「玻璃效果」一行说明，以及 Dock / 启动台两条透明度滑杆。这些都不再需要，现在已经移除：\n\n页面现在只剩三项：\n\n- 使用自定义背景色（含颜色与不透明度）\n- 减少动画\n- （下方）Dock 设置\n\n**行为和代码一起固定**，不是仅仅藏起控件：\n\n- 两条透明度滑杆与它们的事件处理已从界面和代码中删除。\n- `DockGlassTransparency` / `LauncherGlassTransparency` 在加载时一律回到内置默认值\n  （Dock 90%、启动台 20%）。旧文件里存过的自定义数值会被忽略，\n  避免出现「界面上没有开关，但外观仍被一个看不见的值左右」。\n\n### 旧配置不受影响\n\n设置文件里的这两个字段仍然可以读取（不会因此报解析失败），只是加载后会被归一为默认值。\n其余外观设置（自定义背景、减少动画、圆角）保持原样。\n\n## 验证\n\n- 更新测试：透明度不再有控件、写入自定义值后加载回默认、旧磨砂配置仍归一为液态玻璃。\n- 反向验证：临时把一条透明度滑杆加回页面，对应断言确实失败；移除后通过。\n- 真实渲染确认外观页只剩「使用自定义背景色 / 背景颜色 / 背景不透明度 / 减少动画」。\n- InteractionAcceptance 72 项全部通过（含新增的两条断言）。\n- Core 166/166；Dock 491 通过，6 个失败与本机基线一致（Windows 10 不支持系统窗口捕获）。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
+  "version": "5.3.2",
+  "fileName": "WidgeDesk-5.3.2-win-x64-Setup.exe",
+  "size": 60721428,
+  "sha256": "9d8893112dc9dc19be6cc8a7f4e24ed1b8d55bb13db3a0751fbd144f785b95c5",
+  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.3.2/WidgeDesk-5.3.2-win-x64-Setup.exe",
+  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.3.2",
+  "notes": "# WidgeDesk 5.3.2\n\n## Dock 设置页再简化\n\n「Dock」页原来还有一段说明文字、整体大小滑杆、外框长度滑杆，以及「外框长度随内容自动调整」按钮。这些都不再需要，现在全部移除。\n\n页面现在只剩：\n\n- 左侧固定图标（启动台 / 此电脑 / 切换桌面图标 / 设置）\n- 位置\n- 水平偏移\n- 垂直偏移\n\n**外框随内容长度自动调整的行为完整保留**，它现在是固定行为，不再需要按钮去切回。\n\n## 行为与代码一起固定\n\n- 「整体大小」固定为 100%（图标 48 DIP），不再提供调节。\n- 「外框长度」固定为 0，即始终按内容宽度自动计算。\n- 加载设置时这两个字段一律归一到上述固定值；旧文件里存过的自定义尺寸会被忽略，\n  避免出现「界面上没有控件，外观却仍被旧值左右」。\n\n其余 Dock 设置（固定图标开关、位置、偏移）照常保存并立即生效。\n\n## 验证\n\n- 更新测试：页面上不存在 `DockScaleSlider` / `DockFrameLengthSlider` / `DockFrameLengthReadout`；\n  Dock 图标宽度是 48 DIP；写入 `.75` / `900` 后重新加载仍为 `1` / `0`；\n  隐藏一个内置入口后 Dock 会自动收窄（证明外框仍随内容变化）。\n- 反向验证：临时把外框滑杆加回页面，对应断言确实失败；移除后通过。\n- 真实渲染确认 Dock 页只剩固定图标、位置、水平偏移、垂直偏移。\n- InteractionAcceptance 72 项全部通过；Core 166/166。\n- Dock 491 通过，6 个失败与本机基线一致（Windows 10 不支持系统窗口捕获）。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
 }
