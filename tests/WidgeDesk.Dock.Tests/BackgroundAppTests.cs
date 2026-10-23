@@ -109,4 +109,23 @@ public sealed class BackgroundAppTests
         Assert.NotNull(apps);
         Assert.All(apps, app => Assert.NotEqual(0, app.ProcessId));
     }
+
+    [Fact]
+    public void TrayScanIncludesIconsHiddenInTheOverflowPanel()
+    {
+        // 本机实测：可见托盘区 6 枚、溢出面板 8 枚，去重后共 10 个后台程序。
+        // 只读可见托盘区时只能拿到 6 个，所以下面这条数量断言会失败——
+        // 它钉住的正是"溢出面板也参与了扫描"。
+        var apps = TrayAppScanner.Read((uint)Environment.ProcessId);
+        Assert.True(apps.Count >= 9,
+            $"只读到 {apps.Count} 个后台程序；溢出面板里的图标很可能没被读到");
+
+        // 每个读到的图标都必须带可用的回调地址，否则右键无法复用应用菜单。
+        Assert.All(apps, app =>
+        {
+            Assert.NotEqual(0, app.ProcessId);
+            Assert.True(app.IconWindow == 0 || app.CallbackMessage != 0,
+                $"{app.DisplayName} 有窗口却没有回调消息");
+        });
+    }
 }

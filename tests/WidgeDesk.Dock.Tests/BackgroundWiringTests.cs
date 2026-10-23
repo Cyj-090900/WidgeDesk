@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 using WidgeDesk.AppServices;
 using WidgeDesk.Core.Storage;
@@ -31,12 +32,21 @@ public sealed class BackgroundWiringTests
                 dock.UpdateLayout();
                 dock.RefreshTiles();
 
-                Assert.Equal(1, dock.TileCount);
+                // 后台应用在右侧那条里，不占左侧"我固定的应用"。
+                Assert.Equal(0, dock.TileCount);
                 var strip = (DockTileStrip)typeof(DockWindow)
-                    .GetField("_tileStrip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .GetField("_backgroundStrip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
                     .GetValue(dock)!;
                 var tile = Assert.Single(strip.PaintedTiles);
                 Assert.Equal(RunningAppCatalog.AutoTilePrefix + @"d:\apps\background.exe", tile.EntryId);
+
+                // 后台条必须排在托盘区之前、主条之后：这就是"在右边"的定义。
+                var main = Assert.IsType<ContentControl>(dock.FindName("TileStripHost"));
+                var row = Assert.IsType<StackPanel>(main.Parent);
+                var backgroundHost = Assert.IsType<ContentControl>(dock.FindName("BackgroundStripHost"));
+                var tray = Assert.IsType<Border>(dock.FindName("TrayArea"));
+                Assert.True(row.Children.IndexOf(backgroundHost) > row.Children.IndexOf(main));
+                Assert.True(row.Children.IndexOf(tray) > row.Children.IndexOf(backgroundHost));
             }
             finally
             {

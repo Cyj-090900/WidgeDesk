@@ -39,6 +39,35 @@ public partial class DockWindow
     private System.Windows.Threading.DispatcherTimer? _trayTimer;
     private bool _trayAvailable = true;
 
+    /// <summary>
+    /// 自动项 id → 托盘图标。右键自动磁贴时据此让应用弹出自己的菜单。
+    /// </summary>
+    /// <remarks>
+    /// 由 <c>RefreshTiles</c> 在每次归纳后刷新：后台程序的托盘图标会随其启停变化，
+    /// 缓存太久会把消息投递到一个已经消失的窗口上。
+    /// </remarks>
+    private IReadOnlyDictionary<string, TrayApp> _trayIconsByAutoId =
+        new Dictionary<string, TrayApp>(StringComparer.Ordinal);
+
+    /// <summary>这枚自动磁贴对应的托盘图标；没有时为 null。</summary>
+    public TrayApp? TrayIconFor(string autoId) => _trayIconsByAutoId.TryGetValue(autoId, out var app) ? app : null;
+
+    /// <summary>
+    /// 在 Dock 上方弹出这个后台应用**自己的**托盘菜单。
+    /// </summary>
+    /// <remarks>
+    /// 菜单内容完全由应用决定，我们只负责"在正确的位置触发右键"。
+    /// 因此「当前账号」「打开 AiMaMi」「退出」这些条目会与应用在任务栏里
+    /// 弹出的那一份保持一致，并且随应用版本更新自动跟随。
+    /// </remarks>
+    private void ShowTrayIconMenu(TrayApp app)
+    {
+        if (!TrayIconMenu.Show(app))
+        {
+            ShowFailureNotice("这个应用没有提供托盘菜单。");
+        }
+    }
+
     /// <summary>隐藏托盘区（从设置里关掉时）。</summary>
     public bool IsTrayVisible => TrayArea.Visibility == Visibility.Visible;
 

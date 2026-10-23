@@ -285,8 +285,12 @@ public sealed class DockAutoTileTests
     }
 
     private static List<DockTileModel> AllTiles(DockWindow window)
-        => window.TileModels.ToList();
+        => [.. window.TileModels, .. BackgroundTiles(window)];
 
     private static List<DockTileModel> AutoTiles(DockWindow window)
-        => window.TileModels.Where(model => model.IsAuto).ToList();
+        // 自动磁贴现在住在右侧的后台应用条里，不在左侧的固定应用条上。
+        => BackgroundTiles(window).Where(model => model.IsAuto).ToList();
+
+    private static List<DockTileModel> BackgroundTiles(DockWindow window)
+        => [.. window.BackgroundTileModels];
 }

@@ -37,6 +37,23 @@ public static class BackgroundAppCatalog
         IReadOnlyCollection<string> coveredTargets,
         IReadOnlyCollection<string> suppressedAutoIds,
         uint ownProcessId)
+        => Build(trayApps, library, coveredEntryIds, coveredTargets, suppressedAutoIds, ownProcessId, out _);
+
+    /// <summary>
+    /// 同上，并给出每个条目对应的托盘图标。
+    /// </summary>
+    /// <param name="trayIcons">
+    /// 自动项 id → 托盘图标。右键时用它让应用弹出自己的菜单；
+    /// 没有对应图标的条目（例如窗口类自动项）不在其中。
+    /// </param>
+    public static IReadOnlyList<RunningApp> Build(
+        IReadOnlyList<TrayApp> trayApps,
+        AppLibraryStore library,
+        IReadOnlyCollection<string> coveredEntryIds,
+        IReadOnlyCollection<string> coveredTargets,
+        IReadOnlyCollection<string> suppressedAutoIds,
+        uint ownProcessId,
+        out IReadOnlyDictionary<string, TrayApp> trayIcons)
     {
         ArgumentNullException.ThrowIfNull(trayApps);
         ArgumentNullException.ThrowIfNull(library);
@@ -50,6 +67,7 @@ public static class BackgroundAppCatalog
 
         var result = new List<RunningApp>();
         var seenTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var icons = new Dictionary<string, TrayApp>(StringComparer.Ordinal);
 
         foreach (var app in trayApps)
         {
@@ -81,8 +99,12 @@ public static class BackgroundAppCatalog
                 // 没有窗口：点击走「启动或激活」，不会误把别的窗口提到前面。
                 [],
                 []));
+
+            // 记下这个条目对应的托盘图标，供右键弹出应用自己的菜单。
+            icons.TryAdd(id, app);
         }
 
+        trayIcons = icons;
         return result;
     }
 

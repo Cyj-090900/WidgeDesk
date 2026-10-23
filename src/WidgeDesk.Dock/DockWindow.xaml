@@ -113,6 +113,14 @@
                         AutomationProperties.Name="固定的应用"
                         Focusable="False" />
         <!--
+          后台应用（只活在通知区、没有窗口的程序）单独排在右侧托盘区旁边。
+          它们不是用户亲手固定的应用，混在左侧应用区里会让人分不清
+          "我固定的" 与 "系统自动收进来的"。
+        -->
+        <ContentControl x:Name="BackgroundStripHost"
+                        AutomationProperties.Name="后台应用"
+                        Focusable="False" />
+        <!--
           右侧托盘区。刻意不复制系统浮层：实测在 Windows 10 上，任务栏的
           TrayButton / TrayClockWClass 对合成消息与合成鼠标输入都没有反应，
           真正的操作中心、日历面板无法由本进程唤起。所以这里显示真实系统状态，

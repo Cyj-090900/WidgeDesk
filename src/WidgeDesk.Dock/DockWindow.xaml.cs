@@ -59,6 +59,9 @@ public partial class DockWindow : GlassWindow
     private System.Windows.Threading.DispatcherTimer? _failureNoticeTimer;
     private readonly DockTileStrip _tileStrip;
 
+    /// <summary>右侧的后台应用条：只放通知区里的常驻程序。</summary>
+    private readonly DockTileStrip _backgroundStrip;
+
     private readonly List<DockTileModel> _models = [];
 
     // ---- 自动隐藏（D-19） ----
@@ -124,6 +127,13 @@ public partial class DockWindow : GlassWindow
         _tileStrip.UnpinRequested += OnUnpinRequested;
         _tileStrip.SetReorderModel(new DockReorderModel(SaveDockOrder));
         TileStripHost.Content = _tileStrip;
+
+        // 后台应用不参与排序：它们随应用启停来来去去，
+        // 让用户在这里拖动顺序既没有意义，也会和"自动出现/消失"打架。
+        _backgroundStrip = new DockTileStrip();
+        _backgroundStrip.TileClicked += OnTileClicked;
+        _backgroundStrip.TileContextMenuRequested += OnTileContextMenuRequested;
+        BackgroundStripHost.Content = _backgroundStrip;
 
         // 常驻的内置入口不依赖宿主：构造完就该出现在磁贴行上。
         RefreshTiles();
@@ -485,15 +495,23 @@ public partial class DockWindow : GlassWindow
             }
 
             // 自动磁贴排在固定项之后：用户自己排好的顺序不受运行情况影响。
+            _backgroundModels.Clear();
             foreach (var running in BuildAutoTiles())
             {
-                _models.Add(CreateAutoTile(running, settings, dotBrush));
+                _backgroundModels.Add(CreateAutoTile(running, settings, dotBrush));
             }
         }
 
         _tileStrip.SetTiles(_models);
+        _backgroundStrip.SetTiles(_backgroundModels);
         ApplyStripMetrics();
     }
+
+    /// <summary>右侧后台应用区的磁贴。</summary>
+    private readonly List<DockTileModel> _backgroundModels = [];
+
+    /// <summary>右侧后台应用区当前显示的磁贴（测试与诊断用）。</summary>
+    public IReadOnlyList<DockTileModel> BackgroundTileModels => _backgroundModels;
 
     /// <summary>
     /// 此刻应当自动出现在 Dock 上的运行中应用。
@@ -524,7 +542,11 @@ public partial class DockWindow : GlassWindow
             covered,
             [.. windowApps.Select(app => app.Target)],
             suppressed,
-            (uint)Environment.ProcessId);
+            (uint)Environment.ProcessId,
+            out var trayIcons);
+
+        // 右键时要用到「这枚磁贴对应哪个托盘图标」，供弹出应用自己的菜单。
+        _trayIconsByAutoId = trayIcons;
 
         return background.Count == 0 ? windowApps : [.. windowApps, .. background];
     }
@@ -677,6 +699,15 @@ public partial class DockWindow : GlassWindow
             DockSettings.FixedMagnificationPeak,
             8 * scale,
             contentLimit);
+
+        // 后台应用条用与主条相同的单枚尺寸，但自己算上限：
+        // 它不参与主条的滚动，否则右侧托盘会被推着来回动。
+        _backgroundStrip.SetMetrics(
+            DockSettings.FixedIconSize * scale,
+            DockSettings.FixedIconSpacing * scale,
+            DockSettings.FixedMagnificationPeak,
+            8 * scale,
+            Math.Max(1, contentLimit));
     }
 
     private double DockScale => double.IsFinite(Settings.SizeScale)
@@ -1182,6 +1213,13 @@ public partial class DockWindow : GlassWindow
         menu.Opened += (_, _) => menuHandle = (PresentationSource.FromVisual(menu) as System.Windows.Interop.HwndSource)?.Handle ?? 0;
 
         _ = menu.Items.Add(MenuItem("打开", () => ActivateAutoTile(autoId)));
+
+        // 后台程序自带托盘菜单时，把那份菜单原样叫出来：
+        // 条目由应用自己维护（账号状态、打开、退出……），我们不去猜也不需要猜。
+        if (_trayIconsByAutoId.TryGetValue(autoId, out var trayIcon) && trayIcon.CallbackMessage != 0)
+        {
+            _ = menu.Items.Add(MenuItem("应用菜单…", () => ShowTrayIconMenu(trayIcon)));
+        }
 
         // 一个窗口都没有的自动项不该出现（它正是因为有窗口才在这里），
         // 但真出现了也不给一个点了没反应的菜单项。

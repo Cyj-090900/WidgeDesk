@@ -7,7 +7,13 @@ namespace WidgeDesk.Platform.Shell;
 /// <param name="ProcessId">图标所属进程。</param>
 /// <param name="ExecutablePath">该进程的映像路径；读不到时为 null。</param>
 /// <param name="DisplayName">用于显示的名称。</param>
-public sealed record TrayApp(int ProcessId, string? ExecutablePath, string DisplayName);
+/// <param name="IconWindow">
+/// 接收通知消息的窗口。<see cref="CallbackMessage"/> 投递给它，应用就会弹出自己的菜单。
+/// </param>
+/// <param name="CallbackMessage">图标注册的自定义消息号。</param>
+/// <param name="IconId">图标在应用内部的 id，作为该消息的 wParam。</param>
+public sealed record TrayApp(int ProcessId, string? ExecutablePath, string DisplayName,
+    nint IconWindow = 0, int CallbackMessage = 0, int IconId = 0);
 
 /// <summary>
 /// 枚举 Windows 通知区（任务栏右下角展开的那个面板）里的后台应用。
@@ -64,27 +70,43 @@ public static class TrayAppScanner
     /// </remarks>
     public static IReadOnlyList<TrayApp> Read(uint ownProcessId)
     {
-        var toolbar = FindTrayToolbar();
-        if (toolbar == 0) return [];
+        // 两条工具栏：可见托盘区，以及「^」展开后的溢出面板。
+        // 只读前一条会漏掉用户藏起来的图标——它们同样是正在运行的程序。
+        var seen = new HashSet<uint>();
+        var result = new List<TrayApp>();
 
+        foreach (var toolbar in TrayToolbars.Visible())
+        {
+            foreach (var app in ReadToolbar(toolbar, ownProcessId))
+            {
+                if (seen.Add((uint)app.ProcessId)) result.Add(app);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>读一条工具栏里的每一个通知图标。</summary>
+    private static IEnumerable<TrayApp> ReadToolbar(nint toolbar, uint ownProcessId)
+    {
         _ = GetWindowThreadProcessId(toolbar, out var explorerProcessId);
-        if (explorerProcessId == 0) return [];
+        if (explorerProcessId == 0) yield break;
 
         var process = OpenProcess(ProcessVmOperation | ProcessVmRead | ProcessVmWrite, false, explorerProcessId);
-        if (process == 0) return [];
+        if (process == 0) yield break;
 
         nint remote = 0;
+        List<TrayApp>? found = null;
         try
         {
             remote = VirtualAllocEx(process, 0, RemoteBufferSize, MemCommit, PageReadWrite);
-            if (remote == 0) return [];
+            if (remote == 0) yield break;
 
             var count = (int)SendMessageW(toolbar, TbButtonCount, 0, 0);
-            if (count is <= 0 or > 256) return [];
+            if (count is <= 0 or > 256) yield break;
 
-            var seen = new HashSet<uint>();
-            var result = new List<TrayApp>();
             var buffer = new byte[RemoteBufferSize];
+            found = new List<TrayApp>(count);
 
             for (var index = 0; index < count; index++)
             {
@@ -99,29 +121,34 @@ public static class TrayAppScanner
                 if (trayData == 0) continue;
                 if (!ReadProcessMemory(process, trayData, buffer, buffer.Length, out read) || read < 8) continue;
 
-                // TRAYDATA 的第一个字段就是通知图标所属窗口。
+                // TRAYDATA（x64）：hwnd(8) id(4) 消息号(4) hIcon(8) ...
+                // 后面三项正是让应用弹出自己菜单所需要的参数。
                 var hwnd = (nint)BitConverter.ToInt64(buffer, 0);
                 if (hwnd == 0 || !IsWindow(hwnd)) continue;
+                var iconId = BitConverter.ToInt32(buffer, 8);
+                var message = BitConverter.ToInt32(buffer, 12);
 
                 _ = GetWindowThreadProcessId(hwnd, out var owner);
                 if (owner == 0 || owner == ownProcessId) continue;
                 if (owner == explorerProcessId) continue; // 系统图标（音量、网络、操作中心）
-                if (!seen.Add(owner)) continue;
 
-                result.Add(Describe(owner));
+                found.Add(Describe(owner) with
+                {
+                    IconWindow = hwnd,
+                    CallbackMessage = message,
+                    IconId = iconId,
+                });
             }
-
-            return result;
-        }
-        catch (Exception error) when (error is DllNotFoundException or EntryPointNotFoundException)
-        {
-            return [];
         }
         finally
         {
             if (remote != 0) _ = VirtualFreeEx(process, remote, 0, MemRelease);
             _ = CloseHandle(process);
         }
+
+        // 迭代器里不能 yield catch 块之外的东西，先把结果搬出来再逐个返回。
+        if (found is null) yield break;
+        foreach (var app in found) yield return app;
     }
 
     /// <summary>按进程 id 造一条可显示的后台应用记录。</summary>
@@ -164,16 +191,36 @@ public static class TrayAppScanner
         finally { _ = CloseHandle(handle); }
     }
 
-    /// <summary>通知区的那条工具栏；任何一层找不到就返回 0。</summary>
-    private static nint FindTrayToolbar()
+    /// <summary>
+    /// 通知区的两条工具栏：可见托盘区与溢出面板。
+    /// </summary>
+    /// <remarks>
+    /// 溢出面板（<c>NotifyIconOverflowWindow</c>）是独立顶层窗口，里面的
+    /// <c>ToolbarWindow32</c> 标题为「溢出通知区域」。它随「^」按钮创建，
+    /// 创建后即使收起也仍然存在，因此可以静默读取，不必弹出面板打扰用户。
+    /// </remarks>
+    private static List<nint> FindTrayToolbars()
     {
+        var toolbars = new List<nint>(2);
         var tray = FindWindowW("Shell_TrayWnd", null);
-        if (tray == 0) return 0;
+        if (tray == 0) return toolbars;
         var notify = FindWindowExW(tray, 0, "TrayNotifyWnd", null);
-        if (notify == 0) return 0;
+        if (notify == 0) return toolbars;
         var pager = FindWindowExW(notify, 0, "SysPager", null);
-        if (pager == 0) return 0;
-        return FindWindowExW(pager, 0, "ToolbarWindow32", null);
+        if (pager != 0)
+        {
+            var visible = FindWindowExW(pager, 0, "ToolbarWindow32", null);
+            if (visible != 0) toolbars.Add(visible);
+        }
+
+        var overflow = FindWindowW("NotifyIconOverflowWindow", null);
+        if (overflow != 0)
+        {
+            var hidden = FindWindowExW(overflow, 0, "ToolbarWindow32", null);
+            if (hidden != 0) toolbars.Add(hidden);
+        }
+
+        return toolbars;
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]

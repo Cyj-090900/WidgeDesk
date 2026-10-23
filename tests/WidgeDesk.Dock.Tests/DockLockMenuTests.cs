@@ -116,7 +116,7 @@ public sealed class DockLockMenuTests
                 dock.UpdateLayout();
                 dock.RefreshTiles();
 
-                var model = dock.TileModels.Single(tile => tile.IsAuto);
+                var model = dock.BackgroundTileModels.Single(tile => tile.IsAuto);
                 var pin = typeof(DockWindow).GetMethod("PinAutoTile", Private)!;
                 pin.Invoke(dock, [model]);
 
@@ -124,7 +124,7 @@ public sealed class DockLockMenuTests
                 Assert.True(data.Layouts.IsLocked(entry.Id));
                 Assert.Contains(entry.Id, data.Layouts.Dock.PinnedItemIds);
                 // 固定之后它不再是自动项（否则退出后仍会被自动收走）。
-                Assert.All(dock.TileModels, tile => Assert.False(tile.IsAuto));
+                Assert.All(dock.BackgroundTileModels, tile => Assert.False(tile.IsAuto));
             }
             finally
             {
