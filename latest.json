@@ -1,9 +1,9 @@
 {
-  "version": "5.3.0",
-  "fileName": "WidgeDesk-5.3.0-win-x64-Setup.exe",
-  "size": 60726859,
-  "sha256": "7f3d765f44dcf0a51f1c96958e01dbd47cd1fd8c35417acde7efb678ac8924a5",
-  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.3.0/WidgeDesk-5.3.0-win-x64-Setup.exe",
-  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.3.0",
-  "notes": "# WidgeDesk 5.3.0\n\n## 新增：Dock 上的设置入口\n\nDock 左侧固定图标多了一个**齿轮**，点一下直接打开 WidgeDesk 设置中心，不用再去托盘里找。\n\n它和另外三个内置图标一样：\n\n- 固定在应用图标左侧，顺序是「启动台 → 此电脑 → 切换桌面图标 → 设置」。\n- 悬停有和 Dock 其它图标相同的放大曲线。\n- 在「设置 → Dock → 左侧固定图标」里可以单独关掉。\n\n## 外观页只留液态玻璃\n\n磨砂玻璃已经下线：**界面、渲染实现、相关测试一并删除**，不是仅仅把选项藏起来。\n\n- 外观页不再有材质下拉框，只保留一行说明。\n- `FrostedGlassRenderer`、`RenderFrostedBackdropInto` 以及过渡层里所有磨砂分支都已移除。\n\n### 旧配置不会因此丢失\n\n枚举值 `FrostedGlass` 作为一个**只读别名**留在 `GlassMaterialMode` 里。这样做不是保留功能，而是为了兼容：\n\n设置文件是强类型反序列化的，删掉这个枚举值会让写着 `\"FrostedGlass\"` 的旧文件**解析失败**，\n进而被判定成「配置损坏」——用户会莫名丢光应用库、布局和所有外观设置。\n\n保留别名之后，旧文件照常读出，加载时由 `WidgeDeskSettings.Normalize` 归一成液态玻璃，然后照常保存。\n有测试专门覆盖这条路径（`LegacyFrostedChoiceLoadsAsLiquidGlassWithoutLosingTransparency`）。\n\n## 验证\n\n- 新增/更新测试：Dock 四图标任意组合的显示与间距（16 种）、齿轮点击回调、齿轮悬停曲线、外观页无材质选择器、旧磨砂配置归一。\n- 所有新断言都做过反向验证：临时撤掉实现后确实失败，恢复后通过。\n- Dock 测试 487 通过；10 个失败与改动前基线**完全相同**（本机 Windows 10 不支持系统窗口捕获，WGC 相关用例无法通过），已用 `git stash` 逐条比对确认。\n- Core 166/166。19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
+  "version": "5.3.1",
+  "fileName": "WidgeDesk-5.3.1-win-x64-Setup.exe",
+  "size": 60722811,
+  "sha256": "a51efd8ec2fb0ff53c61cfe66a28fd578c3fa40879a95db3126fcd3140660da3",
+  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.3.1/WidgeDesk-5.3.1-win-x64-Setup.exe",
+  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.3.1",
+  "notes": "# WidgeDesk 5.3.1\n\n## 外观页再简化：玻璃效果与透明度设为固定值\n\n「外观」页原来还有「玻璃效果」一行说明，以及 Dock / 启动台两条透明度滑杆。这些都不再需要，现在已经移除：\n\n页面现在只剩三项：\n\n- 使用自定义背景色（含颜色与不透明度）\n- 减少动画\n- （下方）Dock 设置\n\n**行为和代码一起固定**，不是仅仅藏起控件：\n\n- 两条透明度滑杆与它们的事件处理已从界面和代码中删除。\n- `DockGlassTransparency` / `LauncherGlassTransparency` 在加载时一律回到内置默认值\n  （Dock 90%、启动台 20%）。旧文件里存过的自定义数值会被忽略，\n  避免出现「界面上没有开关，但外观仍被一个看不见的值左右」。\n\n### 旧配置不受影响\n\n设置文件里的这两个字段仍然可以读取（不会因此报解析失败），只是加载后会被归一为默认值。\n其余外观设置（自定义背景、减少动画、圆角）保持原样。\n\n## 验证\n\n- 更新测试：透明度不再有控件、写入自定义值后加载回默认、旧磨砂配置仍归一为液态玻璃。\n- 反向验证：临时把一条透明度滑杆加回页面，对应断言确实失败；移除后通过。\n- 真实渲染确认外观页只剩「使用自定义背景色 / 背景颜色 / 背景不透明度 / 减少动画」。\n- InteractionAcceptance 72 项全部通过（含新增的两条断言）。\n- Core 166/166；Dock 491 通过，6 个失败与本机基线一致（Windows 10 不支持系统窗口捕获）。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
 }
