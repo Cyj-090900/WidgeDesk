@@ -513,6 +513,15 @@ public partial class DockWindow : GlassWindow
     /// <summary>右侧后台应用区当前显示的磁贴（测试与诊断用）。</summary>
     public IReadOnlyList<DockTileModel> BackgroundTileModels => _backgroundModels;
 
+    /// <summary>按条目 id 找磁贴：右侧后台条优先，其次左侧固定条。</summary>
+    /// <remarks>
+    /// 两条磁贴条共用同一套点击与右键处理，所以查找必须覆盖两条；
+    /// 只查其中一条会让另一条上的图标变成"点了没反应"。
+    /// </remarks>
+    private DockTileModel? FindTile(string entryId)
+        => _backgroundModels.FirstOrDefault(tile => string.Equals(tile.EntryId, entryId, StringComparison.Ordinal))
+            ?? _models.FirstOrDefault(tile => string.Equals(tile.EntryId, entryId, StringComparison.Ordinal));
+
     /// <summary>
     /// 此刻应当自动出现在 Dock 上的运行中应用。
     /// </summary>
@@ -860,7 +869,9 @@ public partial class DockWindow : GlassWindow
             return;
         }
 
-        var model = _models.FirstOrDefault(tile => string.Equals(tile.EntryId, autoId, StringComparison.Ordinal));
+        // 自动磁贴现在住在右侧的后台条里，不在 _models。
+        // 只查 _models 会让点击与右键直接 return——表现为"点了没反应"。
+        var model = FindTile(autoId);
 
         if (model is null)
         {
@@ -1195,7 +1206,7 @@ public partial class DockWindow : GlassWindow
             return;
         }
 
-        var model = _models.FirstOrDefault(tile => string.Equals(tile.EntryId, autoId, StringComparison.Ordinal));
+        var model = FindTile(autoId);
 
         if (model is null)
         {
@@ -1689,7 +1700,9 @@ public partial class DockWindow : GlassWindow
         }
 
         var desired = BuildAutoTiles().Select(app => app.Id).ToList();
-        var current = _models.Where(tile => tile.IsAuto).Select(tile => tile.EntryId).ToList();
+        // 自动项住在右侧后台条里；从 _models 取会恒为空，
+        // 结果是每次窗口事件都判定"集合变了"并重建整行——图标会不停闪。
+        var current = _backgroundModels.Where(tile => tile.IsAuto).Select(tile => tile.EntryId).ToList();
 
         if (desired.SequenceEqual(current, StringComparer.Ordinal))
         {
