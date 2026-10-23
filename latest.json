@@ -1,9 +1,9 @@
 {
-  "version": "5.5.0",
-  "fileName": "WidgeDesk-5.5.0-win-x64-Setup.exe",
-  "size": 60746207,
-  "sha256": "f92d59e90d493f33e5b515fb88d6f4e43eed7f175b991f12aa5451ed7f326c0d",
-  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.5.0/WidgeDesk-5.5.0-win-x64-Setup.exe",
-  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.5.0",
-  "notes": "# WidgeDesk 5.5.0\n\n## 点击网络/时钟：唤出**真正的**操作中心\n\n上一版我说过\"系统浮层搬不动\"，那个结论是错的——我只枚举了顶层窗口，\n而且用错了输入方式。这次实测把路走通了：\n\n| 尝试 | 结果 |\n|---|---|\n| 向 `TrayButton` 发 `WM_LBUTTONDOWN/UP`、`BM_CLICK` | 无反应 |\n| `SetCursorPos` + `mouse_event` 点击任务栏那颗按钮 | 无反应 |\n| **`SendInput` 发送 Win+A** | **操作中心真的弹出**（已截图确认：定位 / WLAN / 蓝牙 / 夜间模式 / 所有设置 / 音量滑杆 全部在） |\n\n所以现在 Dock 托盘区的**网络图标与时钟**点击后，会唤出 Windows 原生操作中心，\n和你在任务栏上按 Win+A 的效果完全一致。系统不接受这条路径时才退回网络/时间设置页。\n\n## 后台应用也会出现在 Dock 上\n\n你截图里那些通知区小图标（WPS、飞书、Telegram、Spotify、OneDrive 之类）\n以前不会出现在 Dock 上——因为 Dock 只枚举**顶层窗口**，而它们平时把窗口收进通知区，\n根本没有顶层窗口。\n\n现在补上了这条来源：\n\n- 读取任务栏通知区 `ToolbarWindow32` 的每个按钮，跨进程取回 `TRAYDATA`，\n  得到「哪一枚图标属于哪个进程」。\n- 按进程去重，取映像的「文件说明」作为名称，图标走与其它磁贴相同的提取路径。\n- 出现在应用图标之后、托盘区之前，带运行状态点；点击即启动或激活该应用。\n\n实测结果：本机读取到「WPS 服务程序」「Feishu」两条，并自动生成了对应磁贴。\n\n### 去重与排除\n\n- 已固定在 Dock 上的、或窗口类自动磁贴已经覆盖的，不会重复出现。\n- 用户从 Dock 上移除过的（`SuppressedAutoItemIds`），不会自己回来。\n- `ApplicationFrameHost` / `RuntimeBroker` / `ShellExperienceHost` / `SearchApp` /\n  `TextInputHost` 这类纯宿主进程不上 Dock——它们本身不是用户会启动的程序。\n\n## 验证\n\n- 反向验证：断开\"通知区 → 磁贴\"这条接线后，`TrayAppsReachTheDockAsAutoTiles` 确实失败；恢复后通过。\n- 新增 10 个测试：托盘位置与可用性、时钟与系统时间一致、真实状态读取、\n  后台应用归纳与去重、宿主进程排除、移除记录生效、接线、操作中心投递。\n- 既有 6 个 `TileCount` 相关用例改为注入固定扫描结果，\n  避免结果随\"这台机器开着什么后台程序\"漂移。\n- Core 166/166；Dock 504 通过，6 个失败与本机基线一致（Windows 10 不支持系统窗口捕获）。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
+  "version": "5.6.0",
+  "fileName": "WidgeDesk-5.6.0-win-x64-Setup.exe",
+  "size": 60749080,
+  "sha256": "a062aff0c558f959dd1a99df4ab858e358fee302eb4602230cd25f72b6cef50b",
+  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.6.0/WidgeDesk-5.6.0-win-x64-Setup.exe",
+  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.6.0",
+  "notes": "# WidgeDesk 5.6.0\n\n## 右键新增「锁定在 Dock」：退出程序也不会消失\n\n固定项（Dock 上的常驻图标）的右键菜单现在多了两项：\n\n| 状态 | 菜单项 |\n|---|---|\n| 未锁定 | 打开 / **锁定在 Dock** / 从 Dock 移除 |\n| 已锁定 | 打开 / **解锁（允许移除）** |\n\n锁定之后：\n\n- 应用退出，图标**仍然留在 Dock 上**。\n- 重启 WidgeDesk，依然在。\n- 「从 Dock 移除」不再提供——即使沿着拖出栏外那条路径也不会被移走。\n\n解锁只是放开这个保证，**图标不会因此消失**；要移除还得再点「从 Dock 移除」。\n\n### 锁定放在存储层，而不是菜单层\n\n「锁定项拒绝移除」这条规则写在 `LayoutStore.UnpinFromDock` 里，而不是只把菜单项藏起来。\n这样拖出栏外、以及将来任何新的移除入口都会自动受同一道保护——菜单只是它的可见部分。\n\n锁定同时隐含固定：只写锁定集合会留下「界面看不见、却移不掉」的自相矛盾状态，\n所以 `LockToDock` 会一并把条目加进固定列表。\n\n## 后台应用也能固定\n\n上一版引入的后台应用（通知区里的常驻程序）此前只能「打开 / 退出 / 从 Dock 移除」。\n现在它们的右键菜单新增「**固定到 Dock（退出后保留）**」：\n\n- 库里没有这条记录时，先按当前进程的映像路径造一条，再固定并锁定。\n- 固定后它不再是自动项，退出应用也不会被自动收走。\n- 会清掉之前「移除过」的记录，避免点了固定却看不见效果。\n\n## 旧配置兼容\n\n`dock-layout.json` 新增 `lockedItemIds` 字段。旧文件没有该字段时按「没有锁定项」加载，\n固定列表原样保留。\n\n## 验证\n\n- 菜单契约实测：未锁定 `打开 | 锁定在 Dock | 从 Dock 移除`；\n  锁定后 `打开 | 解锁（允许移除）`。\n- 新增 5 个存储层测试：锁定隐含固定、锁定项拒绝移除、解锁后仍保留图标、\n  锁定跨重启保存、写盘失败回滚、旧文件无字段仍可加载。\n- 新增 3 个 Dock 测试：菜单项随锁定状态切换、固定项在应用退出后仍在、\n  「固定到 Dock」会入库并锁定。\n- 反向验证：注释掉 `UnpinFromDock` 的锁定保护后，两条存储测试确实失败；恢复后通过。\n- Core 171/171；Dock 506 通过，6 个失败与本机基线一致（Windows 10 不支持系统窗口捕获）。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
 }
