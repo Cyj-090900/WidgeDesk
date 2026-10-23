@@ -19,6 +19,7 @@ public sealed class LayoutStore
     private readonly JsonFileStore<DockLayout> _dockStore;
     private readonly JsonFileStore<LauncherLayout> _launcherStore;
     private List<string> _lastSavedDockPins = [];
+    private List<string> _lastSavedDockLocks = [];
     private LauncherLayout _lastSavedLauncher = new();
 
     public LayoutStore(string dockLayoutPath, string launcherLayoutPath, TimeProvider? timeProvider = null)
@@ -50,7 +51,9 @@ public sealed class LayoutStore
         Dock = outcome.Value;
         Dock.PinnedItemIds ??= [];
         Dock.SuppressedAutoItemIds ??= [];
+        Dock.LockedItemIds ??= [];
         _lastSavedDockPins = [.. Dock.PinnedItemIds];
+        _lastSavedDockLocks = [.. Dock.LockedItemIds];
         return outcome;
     }
 
@@ -71,12 +74,14 @@ public sealed class LayoutStore
         {
             _dockStore.Save(Dock);
             _lastSavedDockPins = [.. Dock.PinnedItemIds];
+            _lastSavedDockLocks = [.. Dock.LockedItemIds];
         }
         catch
         {
             // Callers mutate the shared Dock object before saving. If the write fails,
             // leave every later reader with the last known persisted order.
             Dock.PinnedItemIds = [.. _lastSavedDockPins];
+            Dock.LockedItemIds = [.. _lastSavedDockLocks];
             throw;
         }
     }
@@ -163,8 +168,48 @@ public sealed class LayoutStore
             return false;
         }
 
+        // 锁定项拒绝移除：这正是「锁定」与「固定」的区别。
+        // 放在这里而不是界面层，是为了让拖出栏外的路径也一并受保护。
+        if (IsLocked(itemId)) return false;
+
         return Dock.PinnedItemIds.Remove(itemId);
     }
+
+    /// <summary>这个条目是否被锁定在 Dock 上。</summary>
+    public bool IsLocked(string? itemId) => !string.IsNullOrEmpty(itemId)
+        && Dock.LockedItemIds.Contains(itemId, StringComparer.Ordinal);
+
+    /// <summary>
+    /// 把条目锁定在 Dock 上：确保它同时是固定项，并记入锁定集合。
+    /// </summary>
+    /// <returns>是否需要写盘（已经是锁定且固定时返回 false）。</returns>
+    /// <remarks>
+    /// 锁定必须隐含固定。若只写锁定集合，"锁定但没固定"会变成一个自相矛盾的状态：
+    /// 界面看不到它，却又拦着用户移除——两边都说不过去。
+    /// </remarks>
+    public bool LockToDock(string? itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return false;
+
+        var changed = false;
+        if (!Dock.LockedItemIds.Contains(itemId, StringComparer.Ordinal))
+        {
+            Dock.LockedItemIds.Add(itemId);
+            changed = true;
+        }
+        if (!Dock.PinnedItemIds.Contains(itemId, StringComparer.Ordinal))
+        {
+            Dock.PinnedItemIds.Add(itemId);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /// <summary>解除锁定；固定项本身保留（解锁不等于移除）。</summary>
+    /// <returns>是否真的移除了锁定。</returns>
+    public bool UnlockFromDock(string? itemId)
+        => !string.IsNullOrEmpty(itemId)
+            && Dock.LockedItemIds.RemoveAll(id => string.Equals(id, itemId, StringComparison.Ordinal)) > 0;
 
     /// <summary>
     /// 清除两份布局中对该 id 的每一处引用。当记录从应用库

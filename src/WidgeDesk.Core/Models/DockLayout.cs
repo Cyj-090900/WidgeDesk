@@ -28,4 +28,15 @@ public sealed class DockLayout
     /// </para>
     /// </remarks>
     public List<string> SuppressedAutoItemIds { get; set; } = [];
+
+    /// <summary>
+    /// 被用户「锁定」在 Dock 上的条目 id。
+    /// </summary>
+    /// <remarks>
+    /// 锁定与「固定」是两件事：固定表示它出现在 Dock 上，锁定表示
+    /// <b>即使应用退出、即使重装/重启，也永远不从 Dock 上移除</b>，直到用户显式解锁。
+    /// 因此锁定集合里的 id 也一定在 <see cref="PinnedItemIds"/> 里——两者由
+    /// <see cref="LayoutStore.LockToDock"/> 一并维护，避免出现「锁定但没固定」的空状态。
+    /// </remarks>
+    public List<string> LockedItemIds { get; set; } = [];
 }

@@ -1093,13 +1093,32 @@ public partial class DockWindow : GlassWindow
 
         _autoHide?.PushSuppress(DateTime.UtcNow);
 
-        var menu = new ContextMenu
-        {
-            Placement = PlacementMode.MousePoint,
-        };
+        var menu = BuildTileMenu(entry);
         var foregroundBefore = WindowControl.GetForegroundWindow();
         nint menuHandle = 0;
         menu.Opened += (_, _) => menuHandle = (PresentationSource.FromVisual(menu) as System.Windows.Interop.HwndSource)?.Handle ?? 0;
+
+        menu.Closed += (_, _) =>
+        {
+            _autoHide?.PopSuppress(DateTime.UtcNow);
+            RestorePopupForeground(foregroundBefore, menuHandle);
+        };
+
+        _ = WindowActivation.TryBringToForeground(Handle);
+        menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// 造一条库条目磁贴的右键菜单。
+    /// </summary>
+    /// <remarks>
+    /// 单独一层是为了让「锁定项不再显示『从 Dock 移除』」这类规则可以被断言——
+    /// 它是一条真实的交互契约，不该只能靠人工点菜单验证。
+    /// </remarks>
+    public ContextMenu BuildTileMenu(AppEntry entry)
+    {
+        var entryId = entry.Id;
+        var menu = new ContextMenu { Placement = PlacementMode.MousePoint };
 
         _ = menu.Items.Add(MenuItem("打开", () => OnTileClicked(this, entryId)));
 
@@ -1116,16 +1135,19 @@ public partial class DockWindow : GlassWindow
             _ = menu.Items.Add(MenuItem("重新定位…", () => RelocateFromDialog(entry)));
         }
 
-        _ = menu.Items.Add(MenuItem("从 Dock 移除", () => OnUnpinRequested(this, entryId)));
+        // 锁定：即使应用退出、重启程序，也不会从 Dock 上消失。
+        // 解锁只是放开这个保证，图标本身仍留在 Dock 上（与「移除」区分）。
+        var locked = _services!.Layouts.IsLocked(entryId);
+        _ = menu.Items.Add(MenuItem(locked ? "解锁（允许移除）" : "锁定在 Dock",
+            () => ToggleDockLock(entryId, locked)));
 
-        menu.Closed += (_, _) =>
+        // 锁定项不提供「移除」：给了也点不动，不如不显示。
+        if (!locked)
         {
-            _autoHide?.PopSuppress(DateTime.UtcNow);
-            RestorePopupForeground(foregroundBefore, menuHandle);
-        };
+            _ = menu.Items.Add(MenuItem("从 Dock 移除", () => OnUnpinRequested(this, entryId)));
+        }
 
-        _ = WindowActivation.TryBringToForeground(Handle);
-        menu.IsOpen = true;
+        return menu;
     }
 
     /// <summary>
@@ -1169,6 +1191,10 @@ public partial class DockWindow : GlassWindow
         }
 
         _ = menu.Items.Add(new Separator());
+
+        // 「固定到 Dock」：自动项本来会随应用退出而消失，固定之后它变成
+        // 库里的常驻条目，退出也不消失。这正是这个菜单项与「从 Dock 移除」的分工。
+        _ = menu.Items.Add(MenuItem("固定到 Dock（退出后保留）", () => PinAutoTile(model)));
         _ = menu.Items.Add(MenuItem("从 Dock 移除", () => RemoveAutoTile(model)));
 
         menu.Closed += (_, _) =>
@@ -1283,6 +1309,92 @@ public partial class DockWindow : GlassWindow
         var item = new MenuItem { Header = header };
         item.Click += (_, _) => onClick();
         return item;
+    }
+
+    /// <summary>
+    /// 锁定 / 解锁一条 Dock 条目。
+    /// </summary>
+    /// <remarks>
+    /// 锁定同时保证「它是固定项」：只写锁定集合会留下一个界面看不到、
+    /// 却又拦着用户移除的自相矛盾状态（<see cref="LayoutStore.LockToDock"/> 一并处理）。
+    /// 解锁只放开保证，图标仍留在 Dock 上——这是它与「从 Dock 移除」的区别。
+    /// </remarks>
+    private void ToggleDockLock(string entryId, bool currentlyLocked)
+    {
+        if (_services is null) return;
+
+        var changed = currentlyLocked
+            ? _services.Layouts.UnlockFromDock(entryId)
+            : _services.Layouts.LockToDock(entryId);
+        if (!changed) return;
+
+        try
+        {
+            _services.Layouts.SaveDock();
+            ShowTemporaryNotice(currentlyLocked
+                ? "已解锁；图标仍在 Dock 上，可以移除了。"
+                : "已锁定：退出程序或重启本程序都不会把它从 Dock 上移除。");
+        }
+        catch (StorageException)
+        {
+            ShowFailureNotice("未能保存锁定状态，已恢复原设置。");
+        }
+
+        RefreshTiles();
+    }
+
+    /// <summary>
+    /// 把一枚自动磁贴「固定」成常驻条目。
+    /// </summary>
+    /// <remarks>
+    /// 自动磁贴的应用通常不在应用库里（它只因正在运行才出现），所以固定有两步：
+    /// 先确保库里有一条可用记录，再把它固定并锁定到 Dock。锁定是刻意的——
+    /// 用户点「固定（退出后保留）」表达的正是「别再自动收走它」。
+    /// </remarks>
+    private void PinAutoTile(DockTileModel model)
+    {
+        if (_services is null) return;
+
+        var entry = model.LaunchEntryId is { } existingId
+            ? _services.Library.Find(existingId)
+            : null;
+
+        if (entry is not { IsUsable: true })
+        {
+            if (string.IsNullOrWhiteSpace(model.LaunchTarget))
+            {
+                ShowFailureNotice("这个应用没有可用的启动目标，无法固定。");
+                return;
+            }
+
+            entry = AppEntryFactory.CreateFromInstalledApp(
+                model.DisplayName, model.LaunchTarget, model.Aumid, model.AutoIconSource);
+            entry.CustomIconPath = model.AutoCustomIconPath;
+
+            var added = _services.Library.Add(entry);
+            if (added != AddEntryResult.Added && _services.Library.Find(entry.Id) is null)
+            {
+                ShowFailureNotice("未能把这个应用加入应用库，固定操作已取消。");
+                return;
+            }
+        }
+
+        // 固定后它不再是自动项；把「移除过」的记录一并清掉，
+        // 否则用户之前点过移除会让这次固定看起来没生效。
+        _services.Layouts.ForgetSuppressedAutoItem(model.EntryId);
+        _services.Layouts.LockToDock(entry.Id);
+
+        try
+        {
+            _services.Layouts.SaveDock();
+            ShowTemporaryNotice($"已把 {model.DisplayName} 固定在 Dock 上；退出后仍会保留。");
+        }
+        catch (StorageException)
+        {
+            ShowFailureNotice("未能保存固定操作，原 Dock 已恢复。");
+        }
+
+        RefreshTiles();
     }
 
     /// <summary>
