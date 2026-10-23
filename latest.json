@@ -1,9 +1,9 @@
 {
-  "version": "5.7.0",
-  "fileName": "WidgeDesk-5.7.0-win-x64-Setup.exe",
-  "size": 60758056,
-  "sha256": "f95d9199f7a47609a7580031349292809a6aa5671eb864ab6b84f62a96fee09b",
-  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.7.0/WidgeDesk-5.7.0-win-x64-Setup.exe",
-  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.7.0",
-  "notes": "# WidgeDesk 5.7.0\n\n## 修复：藏在「^」里的后台程序现在也会上 Dock\n\n上一版只读任务栏**可见**的通知区，所以你截图中落在「^」展开面板里的那些图标\n（AiMaMi、Ztsm、宝塔、MuMu、CokeCloud、UU远程等）全都没被读到。\n\n原因很具体：Windows 10 的通知区分成两块——\n\n| 区域 | 窗口 | 上一版 | 现在 |\n|---|---|---|---|\n| 可见托盘区 | `TrayNotifyWnd` → `SysPager` → `ToolbarWindow32` | 读了 | 读 |\n| 溢出面板 | `NotifyIconOverflowWindow` → `ToolbarWindow32` | **没读** | 读 |\n\n本机实测：可见区 6 枚、溢出面板 8 枚，去重后共 **10 个**后台程序。\n\n## 后台应用移到右侧，与日期时间同侧\n\nDock 现在分成三段：\n\n```\n[内置入口][我固定的应用] │ [后台应用] │ [网络 音量 时钟]\n```\n\n后台应用单独一条，紧邻托盘区。它们不是用户亲手固定的，混在左侧应用区里\n会让人分不清「我固定的」与「系统自动收进来的」。这条也不参与拖拽排序——\n它随应用启停来来去去，排序既没意义也会和自动增删打架。\n\n## 修复：右键后台应用，弹出它自己的菜单\n\n你截图里那个「当前账号 / Codex / 打开 AiMaMi / 退出」面板，是 AiMaMi\n**托盘图标自己的菜单**（不是任务栏跳转列表——实测它的 Jump List 缓存并不存在）。\n\n现在右键后台磁贴多了「**应用菜单…**」，点它会弹出与该应用在任务栏里完全相同的那份菜单。\n\n### 过程中排掉的三个坑\n\n1. **发消息不弹。** 向图标窗口发 `WM_RBUTTONUP`、`WM_CONTEXTMENU` 或它注册的回调消息，\n   AiMaMi 一律没反应；只有**真实鼠标右键**才会弹。所以改成真实右键输入。\n2. **坐标给错，弹的是别人的菜单。** 早期版本按 Dock 上的位置发坐标，\n   结果飞书弹了菜单（它恰好在那一点也有图标）。现在坐标取自图标按钮在\n   工具栏里的实际矩形。\n3. **坐标对了还是没反应。** 因为图标在**收起的**溢出面板里，那块面板不可见，\n   按坐标点过去落到的是盖在上面的别的窗口。现在会先展开面板、等动画结束再点。\n\n判定标准也从「消息返回值」改成了「应用是否真的建了菜单窗口」——\n实测弹成功时会出现 `#32768`（标准菜单窗口类）与 `SysShadow`。\n\n## 验证\n\n- 本机实测：扫描到 10 个后台程序（含溢出面板里的 AiMaMi 等）。\n- 本机实测：右键 AiMaMi 后，其进程弹出 `#32768` + `SysShadow`，连续多次稳定复现。\n- 布局实测：后台磁贴渲染在固定应用之后、托盘区之前（见渲染截图）。\n- 反向验证：把溢出面板排除后，`TrayScanIncludesIconsHiddenInTheOverflowPanel`\n  读到 6 个而非 10 个，断言确实失败；恢复后通过。\n- Core 171/171；Dock 507 通过，6 个失败与本机基线一致（Windows 10 不支持系统窗口捕获）。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
+  "version": "5.7.1",
+  "fileName": "WidgeDesk-5.7.1-win-x64-Setup.exe",
+  "size": 60759360,
+  "sha256": "61d63a3e7448d982e6691115442ad90295226931c6b0cfa4882d2ad6c9913dd4",
+  "downloadUrl": "https://github.com/Cyj-090900/WidgeDesk/releases/download/v5.7.1/WidgeDesk-5.7.1-win-x64-Setup.exe",
+  "page": "https://github.com/Cyj-090900/WidgeDesk/releases/tag/v5.7.1",
+  "notes": "# WidgeDesk 5.7.1\n\n## 修复：后台应用图标点了没反应\n\n上一版把后台应用从左侧条移到右侧后台条时，漏改了两处按 id 查找磁贴的地方。\n它们仍然只扫左侧那条，而自动磁贴已经不在里面了：\n\n```csharp\nvar model = _models.FirstOrDefault(tile => tile.EntryId == autoId);\nif (model is null) return;   // ← 就是这里静默返回\n```\n\n结果是界面上一切正常、图标也亮着，但**左键点了不启动、右键也不出菜单**——\n两条路径都在同一个查找处提前返回了。\n\n现在改为同时查两条磁贴条（右侧后台条优先）：\n\n```csharp\nprivate DockTileModel? FindTile(string entryId)\n    => _backgroundModels.FirstOrDefault(...) ?? _models.FirstOrDefault(...);\n```\n\n## 顺带修掉一个不易察觉的问题\n\n`SyncAutoTiles` 也还在从左侧条读自动项，因此\"当前集合\"恒为空，\n导致每次窗口事件都被判定成\"集合变了\"并重建整行——图标会不停重载、闪。\n现在改为从右侧后台条读取。\n\n## 验证\n\n- 反向验证：把 `FindTile` 改回只查左侧后，\n  `BackgroundTilesAreFoundByTheSharedClickAndMenuPaths` 确实失败；恢复后通过。\n- 新增 3 个测试：后台磁贴能被共用点击/右键路径找到、固定磁贴仍能解析、\n  连续调和不会重建后台条。\n- Core 171/171；Dock 506 通过，10 个失败为本机既有的 WGC/GPU 基线\n  （Windows 10 不支持系统窗口捕获），与本次改动无关。\n- 19 个工程构建通过 18 个，唯一失败是既有 `NETSDK1135`。\n"
 }
