@@ -129,13 +129,22 @@ public partial class DockWindow
             + Environment.NewLine + "点按打开日期与时间设置";
     }
 
-    private void OnNetworkClick(object sender, RoutedEventArgs e) =>
+    /// <summary>点击网络图标：优先唤出真正的操作中心（与任务栏那颗按钮同一目的）。</summary>
+    private void OnNetworkClick(object sender, RoutedEventArgs e)
+    {
+        if (ActionCenter.Toggle()) return;
+        // 系统不认这条路径时退到网络设置：那是确定能到达的地方，而不是点不动的图标。
         ShellExecutor.Open("ms-settings:network-status");
+    }
 
     private void OnVolumeClick(object sender, RoutedEventArgs e) => TrayStatusReader.OpenVolumeMixer();
 
-    private void OnClockClick(object sender, RoutedEventArgs e) =>
+    /// <summary>点击时钟：同样是操作中心（Win10 的日历与通知都在那里）。</summary>
+    private void OnClockClick(object sender, RoutedEventArgs e)
+    {
+        if (ActionCenter.Toggle()) return;
         ShellExecutor.Open("ms-settings:dateandtime");
+    }
 
     /// <summary>滚轮调音量；右键切换静音。</summary>
     private void OnVolumeWheel(object sender, MouseWheelEventArgs e)

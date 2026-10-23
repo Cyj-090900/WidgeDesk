@@ -29,7 +29,9 @@ public class DockPersistenceTests
                 File.WriteAllText(path, "dock drop");
                 using var host = new AppServiceHost(data);
                 var settings = DockSettingsHost.Initialize(Dispatcher.CurrentDispatcher);
-                window = new DockWindow();
+            // 这些用例断言固定项的落盘行为；关掉通知区扫描，
+            // 否则磁贴数量会随这台机器上开着的后台程序而变。
+            window = new DockWindow { ReadTrayApps = () => [] };
                 window.AttachServices(host, settings, () => { });
 
                 using (var blocker = new FileStream(
@@ -84,7 +86,7 @@ public class DockPersistenceTests
 
                 using var host = new AppServiceHost(data);
                 var settings = DockSettingsHost.Initialize(Dispatcher.CurrentDispatcher);
-                window = new DockWindow();
+        window = new DockWindow { ReadTrayApps = () => [] };
                 using (var blocker = new FileStream(
                     data.Layouts.DockFilePath + AtomicFile.TempSuffix,
                     FileMode.Create,
@@ -130,7 +132,7 @@ public class DockPersistenceTests
 
                 using var host = new AppServiceHost(data);
                 var settings = DockSettingsHost.Initialize(Dispatcher.CurrentDispatcher);
-                window = new DockWindow();
+            window = new DockWindow { ReadTrayApps = () => [] };
                 window.AttachServices(host, settings, () => { });
 
                 using (var blocker = new FileStream(

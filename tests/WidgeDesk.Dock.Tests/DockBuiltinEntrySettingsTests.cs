@@ -19,7 +19,9 @@ public sealed class DockBuiltinEntrySettingsTests
         StaTest.Run(() =>
         {
             var root = Path.Combine(Path.GetTempPath(), "WidgeDesk-builtin-" + Guid.NewGuid().ToString("N"));
-            var window = new DockWindow();
+            // 关掉通知区扫描：这条用例断言内置图标的位置与间距，
+            // 不该被这台机器上正在运行的后台程序影响。
+            var window = new DockWindow { ReadTrayApps = () => [] };
             try
             {
                 var data = new WidgeDeskDataStore(new AppPaths(root));

@@ -46,6 +46,16 @@ public partial class DockWindow : GlassWindow
 
     /// <summary>打开 WidgeDesk 设置中心；由宿主注入，Dock 不引用 App 工程。</summary>
     public Action? OpenSettings { get; set; }
+
+    /// <summary>
+    /// 通知区快照的来源；测试可替换，默认读真实系统。
+    /// </summary>
+    /// <remarks>
+    /// 抽成可替换的委托，是为了让「后台程序会不会上 Dock」这件事能在没有
+    /// 真实通知区图标的环境里断言——否则这条接线只能靠人工看界面验证。
+    /// </remarks>
+    public Func<IReadOnlyList<TrayApp>> ReadTrayApps { get; set; }
+        = () => TrayAppScanner.Read((uint)Environment.ProcessId);
     private System.Windows.Threading.DispatcherTimer? _failureNoticeTimer;
     private readonly DockTileStrip _tileStrip;
 
@@ -500,7 +510,23 @@ public partial class DockWindow : GlassWindow
         }
 
         var covered = _services.Layouts.Dock.PinnedItemIds.ToHashSet(StringComparer.Ordinal);
-        return _services.Running.BuildAutoTiles(covered, _services.Layouts.Dock.SuppressedAutoItemIds);
+        var suppressed = _services.Layouts.Dock.SuppressedAutoItemIds;
+        var windowApps = _services.Running.BuildAutoTiles(covered, suppressed);
+
+        // 再补上只活在通知区里的后台程序：它们没有顶层窗口，
+        // 上一条基于窗口快照的路径永远看不到。
+        var trayApps = ReadTrayApps();
+        if (trayApps.Count == 0) return windowApps;
+
+        var background = BackgroundAppCatalog.Build(
+            trayApps,
+            _services.Library,
+            covered,
+            [.. windowApps.Select(app => app.Target)],
+            suppressed,
+            (uint)Environment.ProcessId);
+
+        return background.Count == 0 ? windowApps : [.. windowApps, .. background];
     }
 
     /// <summary>把一条运行中的应用造成磁贴模型。</summary>

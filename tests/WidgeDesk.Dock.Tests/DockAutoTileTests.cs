@@ -271,7 +271,9 @@ public sealed class DockAutoTileTests
             data.LoadAll();
             using var host = new AppServiceHost(data);
             var settings = DockSettingsHost.Initialize(Dispatcher.CurrentDispatcher);
-            window = new DockWindow();
+            // 这些用例断言的是「窗口快照 → 自动磁贴」这条路径。
+            // 关掉通知区扫描，否则结果会取决于跑测试的这台机器恰好开着什么后台程序。
+            window = new DockWindow { ReadTrayApps = () => [] };
             window.AttachServices(host, settings, () => { });
             body(window, host, data);
         }
