@@ -97,7 +97,7 @@ public sealed class DockBuiltinEntrySettingsTests
     }
 
     [Fact]
-    public void ShortFrameSettingMatchesTheSpaceRequiredByEnabledEntries()
+    public void DockFrameAlwaysFollowsItsContentBecauseNoFixedLengthCanBeSet()
     {
         StaTest.Run(() =>
         {
@@ -113,15 +113,14 @@ public sealed class DockBuiltinEntrySettingsTests
                 dock.AttachServices(services, host, () => { });
                 window.AttachDataStore(data, null);
                 dock.Show();
-                var frame = Assert.IsType<Slider>(window.FindName("DockFrameLengthSlider"));
-                frame.Value = frame.Minimum + 8;
-                frame.Value = frame.Minimum;
-                dock.UpdateLayout();
-                Assert.Equal(frame.Value, dock.ActualWidth, 5);
+                // 外框长度不可设置：宽度必须等于内容宽度，不留给任何固定长度覆盖。
+                Assert.Null(window.FindName("DockFrameLengthSlider"));
+                var wide = dock.ActualWidth;
                 Assert.IsType<CheckBox>(window.FindName("ShowDesktopIconsEntryCheckBox")).IsChecked = false;
-                frame.Value = frame.Minimum;
                 dock.UpdateLayout();
-                Assert.Equal(frame.Value, dock.ActualWidth, 5);
+                Assert.True(dock.ActualWidth < wide,
+                    $"隐藏一个内置入口后 Dock 应收窄：before={wide}, after={dock.ActualWidth}");
+                Assert.Equal(0, data.Settings.Current.Dock.FrameLengthDip);
             }
             finally { dock.Close(); window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
         });

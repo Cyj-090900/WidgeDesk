@@ -47,7 +47,7 @@ public sealed class AppearanceCustomizationTests
     }
 
     [Fact]
-    public void SizeSliderUpdatesLiveDockAndPersistsAcrossOtherDockChanges()
+    public void DockSizeAndFrameLengthNoLongerHaveSettingsControls()
     {
         StaTest.Run(() =>
         {
@@ -64,17 +64,26 @@ public sealed class AppearanceCustomizationTests
                 settings.AttachDataStore(data, null);
                 dock.AttachServices(services, host, () => { });
                 dock.Show(); dock.UpdateLayout();
-                var originalHeight = dock.ActualHeight;
-                var slider = Assert.IsType<Slider>(settings.FindName("DockScaleSlider"));
-                slider.Value = .75;
-                dock.UpdateLayout();
-                Assert.Equal(36, Assert.IsType<Button>(dock.FindName("LauncherButton")).Width);
-                Assert.InRange(dock.ActualHeight / originalHeight, .72, .78);
+                // 尺寸与外框长度不再可调：页面上没有控件，Dock 固定用默认尺寸。
+                Assert.Null(settings.FindName("DockScaleSlider"));
+                Assert.Null(settings.FindName("DockFrameLengthSlider"));
+                Assert.Null(settings.FindName("DockFrameLengthReadout"));
+                Assert.Equal(48, Assert.IsType<Button>(dock.FindName("LauncherButton")).Width, 1);
+
+                // 旧文件里写过的自定义尺寸会被归一，而不是悄悄影响外观。
+                data.Settings.Current.Dock.SizeScale = .75;
+                data.Settings.Current.Dock.FrameLengthDip = 900;
+                data.Settings.Save();
+                var reload = new SettingsStore(data.Paths.SettingsFile);
+                reload.Load();
+                Assert.Equal(1, reload.Current.Dock.SizeScale);
+                Assert.Equal(0, reload.Current.Dock.FrameLengthDip);
+
+                // 其它 Dock 设置仍然照常保存。
                 Assert.IsType<Slider>(settings.FindName("DockOffsetXSlider")).Value = 20;
-                var reload = new SettingsStore(data.Paths.SettingsFile); reload.Load();
-                Assert.Equal(.75, typeof(DockSettings).GetProperty("SizeScale")?.GetValue(reload.Current.Dock));
-                Assert.Equal(20, reload.Current.Dock.OffsetX);
-                Assert.Equal(36, Assert.IsType<Button>(dock.FindName("LauncherButton")).Width);
+                var offsetReload = new SettingsStore(data.Paths.SettingsFile);
+                offsetReload.Load();
+                Assert.Equal(20, offsetReload.Current.Dock.OffsetX);
             }
             finally
             {

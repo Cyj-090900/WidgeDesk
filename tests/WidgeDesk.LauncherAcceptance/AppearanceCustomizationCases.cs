@@ -60,24 +60,20 @@ internal static partial class Program
                 "opaque, width >= selector", $"{body.Background}; menu={body.ActualWidth}, combo={placement.ActualWidth}");
             CaptureElement(body, Path.Combine(evidence, "placement-menu.png"));
             placement.IsDropDownOpen = false;
-            var size = (Slider)settings.FindName("DockScaleSlider")!;
-            foreach (var scale in new[] { 2d / 3, .75, 1d, 1.5 })
-            {
-                size.Value = scale;
-                Pump(TimeSpan.FromMilliseconds(400));
-                var entry = (Button)dock.FindName("LauncherButton")!;
-                Check($"Dock 整体大小 {scale:P0} 同步图标与栏高度", "appearance/scale",
-                    Math.Abs(entry.ActualWidth - 48 * scale) < 1 && dock.ActualHeight >= 75 * scale,
-                    $"icon={48 * scale:0.0}; height >= {75 * scale:0.0}", $"icon={entry.ActualWidth}; height={dock.ActualHeight}");
-                settings.Hide();
-                hostType.GetMethod("ShowLauncher", flags, null, Type.EmptyTypes, null)!.Invoke(host, null);
-                Pump(TimeSpan.FromMilliseconds(600));
-                Capture(dock, Path.Combine(evidence, $"dock-{scale:P0}.png"));
-                launcher.CloseWithTransition();
-                Pump(TimeSpan.FromMilliseconds(600));
-                hostType.GetMethod("ShowSettings", flags)!.Invoke(host, null);
-            }
-            size.Value = 1;
+            // 尺寸与外框长度已固定：页面上不应再有对应控件，Dock 保持默认尺寸。
+            Check("Dock 页不再提供整体大小与外框长度", "appearance/scale",
+                settings.FindName("DockScaleSlider") is null && settings.FindName("DockFrameLengthSlider") is null,
+                "no size/frame controls", "removed");
+            var entry = (Button)dock.FindName("LauncherButton")!;
+            Check("Dock 使用默认图标尺寸", "appearance/scale",
+                Math.Abs(entry.ActualWidth - 48) < 1, "48", entry.ActualWidth.ToString("0.0"));
+            settings.Hide();
+            hostType.GetMethod("ShowLauncher", flags, null, Type.EmptyTypes, null)!.Invoke(host, null);
+            Pump(TimeSpan.FromMilliseconds(600));
+            Capture(dock, Path.Combine(evidence, "dock-default.png"));
+            launcher.CloseWithTransition();
+            Pump(TimeSpan.FromMilliseconds(600));
+            hostType.GetMethod("ShowSettings", flags)!.Invoke(host, null);
             // 磨砂已下线：外观页不应再出现材质选择器，且设置里的旧值必须归一成液态玻璃。
             Check("外观页不再提供材质选择", "appearance/material",
                 settings.FindName("AppearanceMaterialCombo") is null, "no selector",

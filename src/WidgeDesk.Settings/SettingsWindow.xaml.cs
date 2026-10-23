@@ -191,38 +191,17 @@ public partial class SettingsWindow : GlassWindow
             ShowThisPcEntryCheckBox.IsChecked = dock.ShowThisPcEntry;
             ShowDesktopIconsEntryCheckBox.IsChecked = dock.ShowDesktopIconsEntry;
             ShowSettingsEntryCheckBox.IsChecked = dock.ShowSettingsEntry;
-            DockScaleSlider.Value = dock.SizeScale;
-            DockScaleReadout.Text = $"{dock.SizeScale:P0} · 图标 {48 * dock.SizeScale:0} DIP";
             DockPlacementCombo.SelectedIndex = (int)dock.Placement;
             var display = PrimaryDisplaySession is { IsAvailable: true } session
                 ? session.Display
                 : PrimaryDisplaySession is null ? DisplayService.Primary() : null;
-            var availableWidthDip = display is null
-                ? DockSettings.MaximumFrameLengthDip
-                : display.ToDips((int)display.WorkArea.Width) - 32;
-            var maximum = Math.Min(DockSettings.MaximumFrameLengthDip, Math.Max(64, availableWidthDip));
-            var entryCount = (dock.ShowLauncherEntry ? 1 : 0) + (dock.ShowThisPcEntry ? 1 : 0)
-                + (dock.ShowDesktopIconsEntry ? 1 : 0) + (dock.ShowSettingsEntry ? 1 : 0);
-            var minimum = Math.Min(Math.Max(DockSettings.MinimumFrameLengthDip,
-                22 + (DockSettings.FixedIconSize + DockSettings.FixedIconSpacing) * entryCount) * dock.SizeScale, maximum);
-            DockFrameLengthSlider.Minimum = minimum;
-            DockFrameLengthSlider.Maximum = maximum;
-            var frameLengthValid = dock.FrameLengthDip == 0
-                || Within(dock.FrameLengthDip, 64, DockSettings.MaximumFrameLengthDip);
-            DockFrameLengthSlider.Value = dock.FrameLengthDip > 0
-                ? Math.Clamp(dock.FrameLengthDip, minimum, maximum)
-                : minimum;
-            DockFrameLengthReadout.Text = dock.FrameLengthDip > 0
-                ? $"固定外框：{DockFrameLengthSlider.Value:0} DIP"
-                : "当前随图标内容自动调整；拖动滑块后固定外框长度。";
             _dockValuesOutOfRange = !Enum.IsDefined(dock.Placement)
-                || !Within(dock.OffsetX, -200, 200) || !Within(dock.OffsetY, -200, 200)
-                || !frameLengthValid;
+                || !Within(dock.OffsetX, -200, 200) || !Within(dock.OffsetY, -200, 200);
             DockOffsetXSlider.Value = Coerce(dock.OffsetX, -200, 200);
             DockOffsetYSlider.Value = Coerce(dock.OffsetY, -200, 200);
             DockSettingsStatus.Text = _dockValuesOutOfRange
                 ? "配置文件中有超出支持范围的数值，已显示为最近的可用值；请先恢复当前页默认，避免覆盖原数据。"
-                : "整体大小调整图标与栏高度；外框长度可独立调整。修改后立即保存并应用。";
+                : "修改后立即保存并应用。";
         }
         finally { _loadingDockControls = false; }
     }
@@ -355,7 +334,8 @@ public partial class SettingsWindow : GlassWindow
         var previousCorner = current.Appearance.DockCornerRadius;
         var next = new DockSettings
         {
-            SizeScale = DockScaleSlider.Value,
+            // 尺寸与外框不再可调：固定默认，外框始终随内容长度自动调整。
+            SizeScale = 1,
             ShowLauncherEntry = ShowLauncherEntryCheckBox.IsChecked == true,
             ShowThisPcEntry = ShowThisPcEntryCheckBox.IsChecked == true,
             ShowDesktopIconsEntry = ShowDesktopIconsEntryCheckBox.IsChecked == true,
@@ -363,9 +343,7 @@ public partial class SettingsWindow : GlassWindow
             IconSize = DockSettings.FixedIconSize,
             IconSpacing = DockSettings.FixedIconSpacing,
             MagnificationPeak = DockSettings.FixedMagnificationPeak,
-            FrameLengthDip = ReferenceEquals(sender, DockFrameLengthSlider)
-                ? DockFrameLengthSlider.Value
-                : previousDock.FrameLengthDip,
+            FrameLengthDip = 0,
             Placement = (DockPlacement)DockPlacementCombo.SelectedIndex,
             OffsetX = DockOffsetXSlider.Value,
             OffsetY = DockOffsetYSlider.Value,
@@ -397,11 +375,8 @@ public partial class SettingsWindow : GlassWindow
             DockSettingsHost.Current?.Update(next);
             if (Math.Abs(previousCorner - current.Appearance.DockCornerRadius) > 0.001)
                 ThemeService.Current?.Update(current.Appearance);
-            DockFrameLengthReadout.Text = next.FrameLengthDip > 0
-                ? $"固定外框：{DockFrameLengthSlider.Value:0} DIP"
-                : "当前随图标内容自动调整；拖动滑块后固定外框长度。";
             LoadDockControls();
-            DockSettingsStatus.Text = $"已保存；整体大小 {next.SizeScale:P0}，图标 {48 * next.SizeScale:0} DIP。";
+            DockSettingsStatus.Text = "已保存并应用。";
         }
         catch (Exception ex)
         {
@@ -410,14 +385,6 @@ public partial class SettingsWindow : GlassWindow
             LoadDockControls();
             DockSettingsStatus.Text = "保存失败，已恢复原设置：" + ex.Message;
         }
-    }
-
-    private void OnDockAutoLengthClick(object sender, RoutedEventArgs e)
-    {
-        if (_dataStore is null || _dockValuesOutOfRange) return;
-        var snapshot = SettingsPageEditor.Clone(_dataStore.Settings.Current);
-        _dataStore.Settings.Current.Dock.FrameLengthDip = 0;
-        SavePageSnapshot(snapshot, "Dock", DockSettingsStatus);
     }
 
     /// <summary>重建环境报告。</summary>

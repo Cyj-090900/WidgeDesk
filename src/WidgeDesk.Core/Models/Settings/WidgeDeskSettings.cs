@@ -56,8 +56,10 @@ public sealed class WidgeDeskSettings
         // 磨砂已下线，旧文件里的 FrostedGlass 在加载时归一到液态玻璃。
         Appearance.Theme = ThemeMode.Dark;
         Appearance.GlassMaterial = GlassMaterialMode.AndroidLiquidGlass;
-        Dock.SizeScale = double.IsFinite(Dock.SizeScale)
-            ? Math.Clamp(Dock.SizeScale, DockSettings.MinimumSizeScale, DockSettings.MaximumSizeScale) : 1;
+        // Dock 尺寸与外框长度不再开放设置：固定默认尺寸，外框始终随内容长度自动调整。
+        // 旧文件里的自定义值会被忽略，避免"界面看不见、外观却被旧值左右"。
+        Dock.SizeScale = 1;
+        Dock.FrameLengthDip = 0;
         // Settings now owns its opaque surface instead of changing every window.
         Appearance.ReduceTransparency = false;
         // 玻璃透明度不再开放设置：固定回内置默认值。

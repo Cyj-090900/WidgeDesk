@@ -95,12 +95,13 @@ internal static partial class Program
             launcher.CloseWithTransition();
             Pump(TimeSpan.FromMilliseconds(600));
             boxes[0].IsChecked = true;
-            var frame = (Slider)settings.FindName("DockFrameLengthSlider")!;
-            frame.Value = frame.Minimum + 8;
-            frame.Value = frame.Minimum;
             Pump(TimeSpan.FromMilliseconds(200));
-            Check("短外框完整容纳三个固定入口", "dock/frame", dock.ActualWidth <= 191 && buttons[2].TranslatePoint(new Point(buttons[2].ActualWidth, 0), dock).X <= dock.ActualWidth, "entry inside short frame", dock.ActualWidth.ToString());
-            data.Settings.Current.Dock.FrameLengthDip = 0;
+            Check("外框始终随内容长度自动调整", "dock/frame",
+                settings.FindName("DockFrameLengthSlider") is null
+                && data.Settings.Current.Dock.FrameLengthDip == 0
+                && buttons[3].TranslatePoint(new Point(buttons[3].ActualWidth, 0), dock).X <= dock.ActualWidth,
+                "content-sized frame",
+                $"frame={dock.ActualWidth:0}; lastRight={buttons[3].TranslatePoint(new Point(buttons[3].ActualWidth, 0), dock).X:0}");
             WidgeDesk.UI.Settings.DockSettingsHost.Current!.Update(data.Settings.Current.Dock);
             settings.Hide();
             hostType.GetMethod("ShowLauncher", flags, null, Type.EmptyTypes, null)!.Invoke(host, null);

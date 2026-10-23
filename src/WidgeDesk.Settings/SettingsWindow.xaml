@@ -196,9 +196,7 @@
               <Separator Margin="0,4,0,14" />
               <TextBlock x:Name="DockSectionHeading" FontSize="16" FontWeight="SemiBold" Text="Dock 设置"
                          Foreground="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
-              <TextBlock Margin="0,10,0,4" TextWrapping="Wrap"
-                         Text="整体大小同时调整图标、间距和栏高度。外框长度可单独调节，悬停放大效果保持不变。" />
-              <TextBlock Margin="0,12,0,4" Text="左侧固定图标" />
+              <TextBlock Margin="0,10,0,4" Text="左侧固定图标" />
               <CheckBox x:Name="ShowLauncherEntryCheckBox" Content="显示启动台" Margin="0,4"
                         AutomationProperties.Name="Dock 显示启动台" Checked="OnDockControlChanged" Unchecked="OnDockControlChanged" />
               <CheckBox x:Name="ShowThisPcEntryCheckBox" Content="显示此电脑" Margin="0,4"
@@ -207,20 +205,10 @@
                         AutomationProperties.Name="Dock 显示切换桌面图标" Checked="OnDockControlChanged" Unchecked="OnDockControlChanged" />
               <CheckBox x:Name="ShowSettingsEntryCheckBox" Content="显示设置" Margin="0,4"
                         AutomationProperties.Name="Dock 显示设置" Checked="OnDockControlChanged" Unchecked="OnDockControlChanged" />
-              <TextBlock Margin="0,4,0,10" TextWrapping="Wrap" Text="按启动台、此电脑、切换桌面图标、设置的顺序固定在左侧。切换桌面图标用于显示或隐藏桌面上的图标；设置图标点开即进入本页面。" />
-              <TextBlock Margin="0,12,0,4" Text="整体大小" />
-              <Slider x:Name="DockScaleSlider" Minimum="0.6666666666666666" Maximum="1.5"
-                      SmallChange="0.05" LargeChange="0.1" IsMoveToPointEnabled="True"
-                      AutomationProperties.Name="Dock 整体大小" ValueChanged="OnDockControlChanged" />
-              <TextBlock x:Name="DockScaleReadout" Margin="0,2,0,6" FontSize="11" AutomationProperties.Name="Dock 整体大小当前值" />
-              <TextBlock Margin="0,12,0,4" Text="外框长度（DIP）" />
-              <Slider x:Name="DockFrameLengthSlider" Minimum="180" Maximum="180" TickFrequency="8"
-                      AutomationProperties.Name="Dock 外框长度（DIP）"
-                      ValueChanged="OnDockControlChanged" />
-              <TextBlock x:Name="DockFrameLengthReadout" Margin="0,2,0,6" FontSize="11"
-                         AutomationProperties.Name="Dock 外框长度当前值" />
-              <Button Content="外框长度随内容自动调整" HorizontalAlignment="Left" Margin="0,2,0,4"
-                      AutomationProperties.Name="Dock 外框长度自动调整" Click="OnDockAutoLengthClick" />
+              <!--
+                整体大小与外框长度不再提供设置项：尺寸固定为默认，外框始终随内容长度自动调整。
+                设置文件里残留的旧值会在加载时归一，避免"界面看不见、外观却被旧值左右"。
+              -->
               <TextBlock Margin="0,12,0,4" Text="位置"
                          Foreground="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
               <ComboBox x:Name="DockPlacementCombo" AutomationProperties.Name="Dock 位置"
