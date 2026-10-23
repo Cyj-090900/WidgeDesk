@@ -112,6 +112,65 @@
         <ContentControl x:Name="TileStripHost"
                         AutomationProperties.Name="固定的应用"
                         Focusable="False" />
+        <!--
+          右侧托盘区。刻意不复制系统浮层：实测在 Windows 10 上，任务栏的
+          TrayButton / TrayClockWClass 对合成消息与合成鼠标输入都没有反应，
+          真正的操作中心、日历面板无法由本进程唤起。所以这里显示真实系统状态，
+          点击打开对应的系统页面或系统音量合成器——那是确实能到达的去处。
+        -->
+        <Border x:Name="TrayArea" Margin="8,0,0,0" Padding="6,0,0,0"
+                BorderThickness="1,0,0,0"
+                BorderBrush="{Binding PanelBorderBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                AutomationProperties.Name="系统托盘">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="NetworkButton" Style="{StaticResource DockEntryButton}"
+                    ToolTip="网络" AutomationProperties.Name="网络状态"
+                    Click="OnNetworkClick">
+              <Viewbox x:Name="NetworkTile" Width="20" Height="20">
+                <Canvas Width="24" Height="24">
+                  <Path x:Name="NetworkGlyph"
+                        Stroke="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                        StrokeThickness="2.1" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        Fill="Transparent" />
+                  <Ellipse x:Name="NetworkDot" Width="3.6" Height="3.6"
+                           Fill="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                           Canvas.Left="10.2" Canvas.Top="17.2" />
+                </Canvas>
+              </Viewbox>
+            </Button>
+            <Button x:Name="VolumeButton" Style="{StaticResource DockEntryButton}"
+                    ToolTip="音量" AutomationProperties.Name="音量状态"
+                    Click="OnVolumeClick" MouseRightButtonUp="OnVolumeRightButtonUp"
+                    MouseWheel="OnVolumeWheel">
+              <Viewbox x:Name="VolumeTile" Width="20" Height="20">
+                <Canvas Width="24" Height="24">
+                  <Path Data="M3,9 H6.6 L11,4.6 V19.4 L6.6,15 H3 Z"
+                        Fill="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+                  <Path x:Name="VolumeWave"
+                        Data="M14.6,8.8 A5.2,5.2 0 0 1 14.6,15.2 M17.6,6.2 A9,9 0 0 1 17.6,17.8"
+                        Stroke="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                        StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        Fill="Transparent" />
+                  <Path x:Name="VolumeMutedCross"
+                        Data="M15.4,9.4 L20.6,14.6 M20.6,9.4 L15.4,14.6"
+                        Stroke="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                        StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        Visibility="Collapsed" />
+                </Canvas>
+              </Viewbox>
+            </Button>
+            <Button x:Name="ClockButton" Style="{StaticResource DockEntryButton}"
+                    ToolTip="日期与时间" AutomationProperties.Name="日期与时间"
+                    Click="OnClockClick">
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="ClockTime" FontSize="12" HorizontalAlignment="Center"
+                           Foreground="{Binding ForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <TextBlock x:Name="ClockDate" FontSize="9" HorizontalAlignment="Center" Margin="0,-1,0,0"
+                           Foreground="{Binding SecondaryForegroundBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Border>
       </StackPanel>
 
       <TextBlock

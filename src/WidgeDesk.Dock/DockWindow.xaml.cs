@@ -117,6 +117,7 @@ public partial class DockWindow : GlassWindow
 
         // 常驻的内置入口不依赖宿主：构造完就该出现在磁贴行上。
         RefreshTiles();
+        InitializeTray();
     }
 
     /// <summary>
@@ -622,12 +623,27 @@ public partial class DockWindow : GlassWindow
         LaunchpadTile.CornerRadius = new CornerRadius(16 * scale);
         PanelCornerRadius = new CornerRadius(40 * scale);
 
+        // 托盘图标比应用图标小：它们表示系统状态，不该和可启动的应用争夺注意力。
+        foreach (var button in new[] { NetworkButton, VolumeButton })
+        {
+            button.Width = 30 * scale;
+            button.Height = 34 * scale;
+            button.Padding = new Thickness(0);
+        }
+        NetworkTile.Width = NetworkTile.Height = VolumeTile.Width = VolumeTile.Height = 20 * scale;
+        ClockButton.Padding = new Thickness(6 * scale, 0, 2 * scale, 0);
+        ClockButton.Height = 34 * scale;
+        ClockTime.FontSize = 12 * scale;
+        ClockDate.FontSize = 9 * scale;
+
         var contentLimit = display is null
             ? 0.0
-            : Math.Max(1, display.ToDips((int)display.WorkArea.Width) - 32 - (28 + BuiltinEntryWidthDip) * scale);
+            : Math.Max(1, display.ToDips((int)display.WorkArea.Width) - 32
+                - (28 + BuiltinEntryWidthDip) * scale - TrayWidthDip);
 
         if (settings.FrameLengthDip > 0)
-            contentLimit = Math.Max(1, ResolveEffectiveFrameLengthDip(settings.FrameLengthDip, display) - (22 + BuiltinEntryWidthDip) * scale);
+            contentLimit = Math.Max(1, ResolveEffectiveFrameLengthDip(settings.FrameLengthDip, display)
+                - (22 + BuiltinEntryWidthDip) * scale - TrayWidthDip);
 
         _tileStrip.SetMetrics(
             DockSettings.FixedIconSize * scale,
